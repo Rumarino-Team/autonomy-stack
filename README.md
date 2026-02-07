@@ -3,8 +3,8 @@
 
 ### Clone and go in repo
 ```sh
-git clone --recursive git@github.com:joseburgosguntin/rumarino-ros2-jazzy.git
-cd ./rumarino-ros2-jazzy
+git clone --recursive https://github.com/Rumarino-Team/autonomy-stack.git
+cd ./autonomy-stack
 ```
 
 ## Quick Start with Docker (Recommended for CI/CD)
@@ -107,18 +107,12 @@ cd ../../../../../
 cd ~/ros2_ws/rumarino-ros2-jazzy
 
 # Source ROS 2 environment
-# Fedora:
-source /usr/lib64/ros2-jazzy/setup.zsh
-# Ubuntu:
 source /opt/ros/jazzy/setup.bash
 
 # Build packages
 colcon build --packages-select interfaces bringup Stonefish stonefish_ros2 controller_stonefish mission_executor
 
 # Source the workspace
-# Fedora
-source install/setup.sh
-# Ubuntu
 source install/setup.bash
 
 # Run with GUI
@@ -135,5 +129,5 @@ ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify env
 
 ### Run ZED Custom Wrapper
 ```sh
-colcon build --packages-select zed_custom_wrapper && source ./install/setup.bash && ros2 launch zed_custom_wrapper zed_custom.launch.py onnx_model_path:=./src/zed_custom_wrapper/yolov8n.onnx
+colcon build --packages-select zed_msg zed_custom_wrapper && source ./install/setup.bash && ros2 launch zed_custom_wrapper zed_custom.launch.py onnx_model_path:=./src/zed_custom_wrapper/yolov8n.onnx
 ```
