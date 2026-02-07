@@ -12,7 +12,7 @@ target/
 **/build/
 **/install/
 **/log/
-
+vendor/stonefish
 # IDE
 .vscode/
 .idea/

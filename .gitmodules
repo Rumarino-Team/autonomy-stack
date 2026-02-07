@@ -4,6 +4,6 @@
 [submodule "vendor/stonefish_ros2"]
 	path = vendor/stonefish_ros2
 	url = https://github.com/JuanDelPueblo/stonefish_ros2.git
-[submodule "vendor/zed-ros2-examples"]
-	path = vendor/zed-ros2-examples
-	url = https://github.com/stereolabs/zed-ros2-examples.git
+[submodule "vendor/zed-ros-interfaces"]
+	path = vendor/zed-ros-interfaces
+	url = https://github.com/stereolabs/zed-ros2-interfaces.git
