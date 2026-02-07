@@ -2,7 +2,7 @@ name: Headless Simulation Test
 
 on:
   push:
-    branches: [ main, zed_node_update ]
+    branches: [ main, docker, zed_node_update ]
 
   workflow_dispatch:
 
