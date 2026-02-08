@@ -20,7 +20,7 @@
 #include <chrono>
 #include <atomic>
 #include <memory>
-#include <map>
+#include <cstdint>
 #include <vector>
 
 namespace zed_custom_wrapper
@@ -126,16 +126,14 @@ private:
     rclcpp::Publisher<interfaces::msg::Map>::SharedPtr pub_map_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;
     
-    // TF Broadcaster
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
-    // Object tracking state
     // Vector of tracked objects (index represents unique object position in map)
     std::vector<interfaces::msg::MapObject> map_objects_;
     
     // Tracking parameters
     double matching_distance_threshold_;
-    std::map<int, int> expected_object_counts_;  // class_id -> expected count
+    std::vector<uint8_t> expected_object_counts_;
 };
 
 }  // namespace zed_custom_wrapper

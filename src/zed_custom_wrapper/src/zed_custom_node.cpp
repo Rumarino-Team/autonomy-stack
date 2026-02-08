@@ -3,6 +3,7 @@
 #include <cmath>
 #include <set>
 #include <fstream>
+#include <limits>
 
 using namespace std::chrono_literals;
 
@@ -27,12 +28,32 @@ void ZedCustomNode::initialize() {
     
     // Load expected object counts
     auto counts_param = this->get_parameter("expected_object_counts").as_integer_array();
-    if (counts_param.size() % 2 == 0) {
+    if (counts_param.size() % 2 == 0 && !counts_param.empty()) {
+        int max_class_id = -1;
+        for (size_t i = 0; i < counts_param.size(); i += 2) {
+            int class_id = static_cast<int>(counts_param[i]);
+            if (class_id > max_class_id) {
+                max_class_id = class_id;
+            }
+        }
+
+        if (max_class_id >= 0) {
+            expected_object_counts_.assign(static_cast<size_t>(max_class_id + 1), 0);
+        }
+
         for (size_t i = 0; i < counts_param.size(); i += 2) {
             int class_id = static_cast<int>(counts_param[i]);
             int count = static_cast<int>(counts_param[i + 1]);
-            expected_object_counts_[class_id] = count;
-            RCLCPP_INFO(this->get_logger(), "Expected %d object(s) of class %d", count, class_id);
+            if (class_id >= 0 && static_cast<size_t>(class_id) < expected_object_counts_.size()) {
+                if (count > std::numeric_limits<uint8_t>::max()) {
+                    count = std::numeric_limits<uint8_t>::max();
+                    RCLCPP_WARN(this->get_logger(),
+                        "Expected count for class %d exceeds 255; clamping to 255",
+                        class_id);
+                }
+                expected_object_counts_[class_id] = static_cast<uint8_t>(count);
+                RCLCPP_INFO(this->get_logger(), "Expected %d object(s) of class %d", count, class_id);
+            }
         }
     }
     
@@ -391,8 +412,9 @@ void ZedCustomNode::publishMap(sl::Objects& sl_objects, rclcpp::Time timestamp) 
         int class_id = sl_obj.raw_label;  // YOLO class ID
         
         // Skip if this class is not in expected_object_counts (filter unwanted classes)
-        if (!expected_object_counts_.empty() && 
-            expected_object_counts_.find(class_id) == expected_object_counts_.end()) {
+        if (!expected_object_counts_.empty() &&
+            (class_id < 0 || static_cast<size_t>(class_id) >= expected_object_counts_.size() ||
+             expected_object_counts_[class_id] == 0)) {
             RCLCPP_DEBUG(this->get_logger(), 
                 "Ignoring detected object of class %d (not in expected_object_counts)", class_id);
             continue;
@@ -437,8 +459,10 @@ void ZedCustomNode::publishMap(sl::Objects& sl_objects, rclcpp::Time timestamp) 
             }
             
             // Get expected count for this class
-            auto it = expected_object_counts_.find(class_id);
-            int expected_count = (it != expected_object_counts_.end()) ? it->second : 0;
+            int expected_count = 0;
+            if (class_id >= 0 && static_cast<size_t>(class_id) < expected_object_counts_.size()) {
+                expected_count = expected_object_counts_[class_id];
+            }
             
             // Only add if we haven't reached the expected count
             if (current_count < expected_count) {
