@@ -8,7 +8,7 @@ mod missions;
 mod navigation;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwap;
@@ -21,6 +21,8 @@ type Vector8<T> = Vector<T, U8, ArrayStorage<T, 8, 1>>;
 use parry3d_f64::shape::Segment;
 use r2r::{Node, ParameterValue, QosProfile};
 use tokio::sync::Notify;
+use tokio::signal::unix::{signal, SignalKind};
+use tokio::time::timeout;
 
 #[derive(Clone, Copy, Debug)]
 struct Pose {
@@ -46,6 +48,7 @@ struct MissionExecutor {
     pub new_objects: Notify,
     pub pose: ArcSwap<Pose>,
     pub goal: ArcSwap<Vector6<f64>>,
+    pub stop: AtomicBool,
     pub mission: Box<dyn Mission>,
 }
 
@@ -69,6 +72,7 @@ impl MissionExecutor {
             new_objects: Notify::new(),
             pose: ArcSwap::new(Arc::new(origin)),
             goal: ArcSwap::new(Arc::new(goal)),
+            stop: AtomicBool::new(false),
             mission,
         }
     }
@@ -81,7 +85,7 @@ impl MissionExecutor {
         old_goal.y = dest.y;
         old_goal.z = dest.z;
         self.goal.store(Arc::new(old_goal));
-        loop {
+        while !self.stop.load(Ordering::Relaxed) {
             let pose = self.pose.load();
             let goal = self.goal.load();
             let dist = pose.pos.metric_distance(&dest);
@@ -265,7 +269,7 @@ async fn main() {
         let mut sum_err = Vector6::zeros();
         let mut prev_pose_err = Vector6::zeros();
         let mut prev_now = Instant::now();
-        loop {
+        while !td.stop.load(Ordering::Relaxed) {
             let now = Instant::now();
             let dt = now.duration_since(prev_now).as_secs_f64();
 
@@ -325,7 +329,7 @@ async fn main() {
     };
 
     let scout = |td: Arc<MissionExecutor>| async move {
-        loop {
+        while !td.stop.load(Ordering::Relaxed) {
             // TODO: do scouting, this code has to have .await's so that abort works
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
@@ -333,7 +337,7 @@ async fn main() {
     let mut scout_handle = tokio::spawn(scout(Arc::clone(&td)));
 
     let consume_new_objects = |td: Arc<MissionExecutor>| async move {
-        loop {
+        while !td.stop.load(Ordering::Relaxed) {
             td.new_objects.notified().await;
             scout_handle.abort();
             let mut reacted = td.map_objects_reacted.load(Ordering::Relaxed);
@@ -441,9 +445,16 @@ async fn main() {
 
     td.map.store(Arc::new(map_msg));
     td.new_objects.notify_one();
+    
+    let td2 = Arc::clone(&td);
+
+    ctrlc::set_handler(move || {
+        r2r::log_info!("mission_executor", "Gracefully shutting down...");
+        td2.stop.store(true, Ordering::Relaxed);
+    }).expect("Failed to add interrupt handler");
 
     r2r::log_info!("", "start spinning!");
-    loop {
+    while !td.stop.load(Ordering::Relaxed) {
         node.spin_once(Duration::from_millis(100));
     }
 }
