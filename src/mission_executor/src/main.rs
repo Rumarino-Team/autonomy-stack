@@ -23,6 +23,7 @@ use r2r::{Node, ParameterValue, QosProfile};
 use tokio::sync::Notify;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::timeout;
+use futures::lock::Mutex;
 
 #[derive(Clone, Copy, Debug)]
 struct Pose {
@@ -49,10 +50,13 @@ struct MissionExecutor {
     pub pose: ArcSwap<Pose>,
     pub goal: ArcSwap<Vector6<f64>>,
     pub stop: AtomicBool,
+    pub avg_current: Arc<Mutex<f64>>,
     pub mission: Box<dyn Mission>,
 }
 
 const CLOSE_ENOUGH: f64 = 1.0;
+const THRUSTER_USAGE: f64 = 1.0; //In milliamps
+const BATTERY_CAPACITY: u32 = 5000; // In mAh
 
 impl MissionExecutor {
     pub fn new(mission: Box<dyn Mission>) -> Self {
@@ -73,6 +77,7 @@ impl MissionExecutor {
             pose: ArcSwap::new(Arc::new(origin)),
             goal: ArcSwap::new(Arc::new(goal)),
             stop: AtomicBool::new(false),
+            avg_current: Arc::new(Mutex::new(0.0)),
             mission,
         }
     }
@@ -269,6 +274,7 @@ async fn main() {
         let mut sum_err = Vector6::zeros();
         let mut prev_pose_err = Vector6::zeros();
         let mut prev_now = Instant::now();
+        let mut count = 1.0; //Technically can be an integer but since we are multiplying by float...
         while !td.stop.load(Ordering::Relaxed) {
             let now = Instant::now();
             let dt = now.duration_since(prev_now).as_secs_f64();
@@ -320,6 +326,15 @@ async fn main() {
             thrusters_pub
                 .publish(&thrusters_msg)
                 .expect("Failed to publish");
+
+            let mut sum_curr = 0.0;
+            for val in &thurstor_values {
+                sum_curr += THRUSTER_USAGE * val.abs();
+            }
+            let mut avg_curr = td.avg_current.lock().await;
+            *avg_curr = (*avg_curr * (count - 1.0) + sum_curr) / count;
+            count += 1.0;
+            drop(avg_curr);
 
             prev_pose_err = pose_err;
             prev_now = now;
@@ -457,4 +472,10 @@ async fn main() {
     while !td.stop.load(Ordering::Relaxed) {
         node.spin_once(Duration::from_millis(100));
     }
+
+    let avg_current = td.avg_current.lock().await;
+
+    r2r::log_info!("battery_report", "Average current in runtime: {:.2}", *avg_current);
+    let batt_usage = f64::from(BATTERY_CAPACITY) / *avg_current;
+    r2r::log_info!("battery_report", "Average battery usage in runtime: {batt_usage:.2} hours");
 }
