@@ -63,28 +63,28 @@
 		<dimensions xyz="50.0 0.2 2.4" />
 		<material name="steel" />
 		<look name="gray" />
-		<world_transform rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.9" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="25.0 0.0 0.9" />
 	</static>
 
 	<static name="Wall2" type="box">
 		<dimensions xyz="0.2 22.86 2.4" />
 		<material name="steel" />
 		<look name="gray" />
-		<world_transform rpy="0.0 0.0 0.0" xyz="25.0 11.43 0.9" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="50.0 11.43 0.9" />
 	</static>
 
 	<static name="Wall3" type="box">
 		<dimensions xyz="50.0 0.2 2.4" />
 		<material name="steel" />
 		<look name="gray" />
-		<world_transform rpy="0.0 0.0 0.0" xyz="0.0 22.86 0.9" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="25.0 22.86 0.9" />
 	</static>
 
 	<static name="Wall4" type="box">
 		<dimensions xyz="0.2 22.86 2.4" />
 		<material name="steel" />
 		<look name="gray" />
-		<world_transform rpy="0.0 0.0 0.0" xyz="-25.0 11.43 0.9" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="0.0 11.43 0.9" />
 	</static>
 
 	<static name="Gate" type="model">
@@ -98,13 +98,86 @@
 		</visual>
 		<material name="steel" />
 		<look name="gatetex" />
-		<world_transform rpy="0.0 0.0 0.0" xyz="10.0 11.43 2.1" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="3.0 3.0 2.1" />
+	</static>
+
+	<static name="Marker" type="model">
+		<physical>
+			<mesh filename="models/marker.obj" scale="1.0" convex="false" />
+			<origin xyz="0.0 0.0 -1.0" rpy="0.0 3.1415 0.0" />
+		</physical>
+		<material name="steel" />
+		<look name="yellow" />
+		<world_transform rpy="0.0 0.0 1.571" xyz="3.0 3.0 2.75" />
+	</static>
+
+	<static name="Pole1" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="1.5 5.0 0.45" />
+	</static>
+
+	<static name="Pole2" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="3.0 5.0 0.45" />
+	</static>
+
+	<static name="Pole3" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="4.5 5.0 0.45" />
+	</static>
+
+	<static name="Pole4" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="2.0 6.5 0.45" />
+	</static>
+
+	<static name="Pole5" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="3.5 6.5 0.45" />
+	</static>
+
+	<static name="Pole6" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="5.0 6.5 0.45" />
+	</static>
+
+	<static name="Pole7" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="1.5 8.0 0.45" />
+	</static>
+
+	<static name="Pole8" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="3.0 8.0 0.45" />
+	</static>
+
+	<static name="Pole9" type="cylinder">
+		<dimensions radius="0.0254" height="0.9" />
+		<material name="acrylic" />
+		<look name="clear" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="4.5 8.0 0.45" />
 	</static>
 
 	<!-- Single Hydrus AUV instance -->
 	<include file="scenarios/hydrus_auv.scn">
 		<arg name="robot_name" value="HydrusAUV" />
 		<arg name="robot_rpy" value="0.0 0.0 0.0" />
-		<arg name="robot_position" value="-3.0 1.0 1.0" />
+		<arg name="robot_position" value="1.0 1.0 1.0" />
 	</include>
 </scenario>
