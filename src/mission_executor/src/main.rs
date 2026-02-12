@@ -354,93 +354,10 @@ async fn main() {
         }
     };
 
-    // tokio::spawn(consume_map_sub(Arc::clone(&td)));
+    tokio::spawn(consume_map_sub(Arc::clone(&td)));
     tokio::spawn(consume_odometry_sub(Arc::clone(&td)));
     tokio::spawn(consume_new_objects(Arc::clone(&td)));
     tokio::spawn(go_to_goal(Arc::clone(&td)));
-
-    let mut map_msg = MapMsg::default();
-
-    map_msg.map_bounds.center.position = PointMsg {
-        x: 0.0,
-        y: 1.5,
-        z: 2.0,
-    };
-    map_msg.map_bounds.center.orientation = QuaternionMsg {
-        w: 1.0,
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
-    map_msg.map_bounds.size = Vector3Msg {
-        x: 1000.0,
-        y: 1000.0,
-        z: 3.0,
-    };
-
-    let mut gate_object_msg = MapObjectMsg::default();
-    gate_object_msg.cls = ObjectCls::Gate as i32;
-    gate_object_msg.bbox.center.position = PointMsg {
-        x: 5.0,
-        y: 1.5,
-        z: 2.0,
-    };
-    gate_object_msg.bbox.center.orientation = QuaternionMsg {
-        w: 1.0,
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
-    gate_object_msg.bbox.size = Vector3Msg {
-        x: 0.04,
-        y: 3.0 + (2.0 * 0.04),
-        z: 4.0,
-    };
-
-    let mut cube_object_msg = MapObjectMsg::default();
-    cube_object_msg.cls = ObjectCls::Cube as i32;
-    cube_object_msg.bbox.center.position = PointMsg {
-        x: 20.0,
-        y: 1.0,
-        z: 2.0,
-    };
-    cube_object_msg.bbox.center.orientation = QuaternionMsg {
-        w: 1.0,
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
-    cube_object_msg.bbox.size = Vector3Msg {
-        x: 0.2,
-        y: 0.2,
-        z: 4.0,
-    };
-
-    let mut other_object_msg = MapObjectMsg::default();
-    other_object_msg.cls = ObjectCls::Other as i32;
-    other_object_msg.bbox.center.position = PointMsg {
-        x: 0.0,
-        y: 1.0,
-        z: 2.0,
-    };
-    other_object_msg.bbox.center.orientation = QuaternionMsg {
-        w: 1.0,
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
-    other_object_msg.bbox.size = Vector3Msg {
-        x: 1.5,
-        y: 1.5,
-        z: 1.5,
-    };
-
-    map_msg.objects.push(gate_object_msg);
-    map_msg.objects.push(other_object_msg);
-    map_msg.objects.push(cube_object_msg);
-
-    td.map.store(Arc::new(map_msg));
-    td.new_objects.notify_one();
 
     r2r::log_info!("", "start spinning!");
     loop {

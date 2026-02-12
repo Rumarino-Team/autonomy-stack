@@ -52,7 +52,12 @@ add_executable(detection_mocker src/main.cpp)
 target_link_libraries(detection_mocker detection_mocker_lib)
 ament_target_dependencies(detection_mocker rclcpp)
 
-install(TARGETS detection_mocker
+# Static map publisher (oneshot mode)
+add_executable(static_map_publisher src/static_map_publisher.cpp)
+target_link_libraries(static_map_publisher detection_mocker_lib)
+ament_target_dependencies(static_map_publisher rclcpp interfaces vision_msgs)
+
+install(TARGETS detection_mocker static_map_publisher
   DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS detection_mocker_lib
