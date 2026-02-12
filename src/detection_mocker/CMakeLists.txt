@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.8)
 project(detection_mocker)
 
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -15,19 +19,24 @@ find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 
-add_executable(detection_mocker
+# Find TinyXML2 (system library)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(TINYXML2 REQUIRED tinyxml2)
+
+# Create library for DetectionMocker class
+add_library(detection_mocker_lib SHARED
   src/detection_mocker.cpp
   src/xml_parser.cpp
   src/transforms.cpp
-  src/frustum_culler.cpp
-  include/3rdparty/tinyxml2.cpp)
+  src/frustum_culler.cpp)
 
-target_include_directories(detection_mocker PUBLIC
+target_include_directories(detection_mocker_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/3rdparty>
-  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+  ${TINYXML2_INCLUDE_DIRS})
 
-ament_target_dependencies(detection_mocker
+ament_target_dependencies(detection_mocker_lib
   rclcpp
   interfaces
   sensor_msgs
@@ -36,12 +45,20 @@ ament_target_dependencies(detection_mocker
   vision_msgs
 )
 
-target_link_libraries(detection_mocker Eigen3::Eigen)
+target_link_libraries(detection_mocker_lib Eigen3::Eigen ${TINYXML2_LIBRARIES})
 
-target_compile_features(detection_mocker PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+# Main executable
+add_executable(detection_mocker src/main.cpp)
+target_link_libraries(detection_mocker detection_mocker_lib)
+ament_target_dependencies(detection_mocker rclcpp)
 
 install(TARGETS detection_mocker
   DESTINATION lib/${PROJECT_NAME})
+
+install(TARGETS detection_mocker_lib
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin)
 
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}/)

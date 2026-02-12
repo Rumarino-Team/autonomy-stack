@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include <map>
+#include <cmath>
 
 namespace detection_mocker
 {
@@ -80,6 +81,35 @@ namespace detection_mocker
             {
                 CameraConfig config;
 
+                config.offset = Eigen::Vector3d::Zero();
+                config.rotation_rpy = Eigen::Vector3d::Zero();
+
+                tinyxml2::XMLElement *specs = sensor->FirstChildElement("specs");
+                if (!specs)
+                {
+                    throw std::runtime_error("Camera <sensor> missing <specs> element");
+                }
+
+                int resolution_x = 0;
+                int resolution_y = 0;
+                double horizontal_fov_deg = 0.0;
+
+                if (specs->QueryIntAttribute("resolution_x", &resolution_x) != tinyxml2::XML_SUCCESS ||
+                    specs->QueryIntAttribute("resolution_y", &resolution_y) != tinyxml2::XML_SUCCESS ||
+                    specs->QueryDoubleAttribute("horizontal_fov", &horizontal_fov_deg) != tinyxml2::XML_SUCCESS)
+                {
+                    throw std::runtime_error("Camera <specs> missing resolution_x, resolution_y, or horizontal_fov");
+                }
+
+                if (resolution_x <= 0 || resolution_y <= 0 || horizontal_fov_deg <= 0.0)
+                {
+                    throw std::runtime_error("Camera <specs> has invalid resolution or FOV values");
+                }
+
+                config.resolution_x = resolution_x;
+                config.resolution_y = resolution_y;
+                config.horizontal_fov_rad = horizontal_fov_deg * M_PI / 180.0;
+
                 // Find <origin> element
                 tinyxml2::XMLElement *origin = sensor->FirstChildElement("origin");
                 if (origin)
@@ -152,10 +182,14 @@ namespace detection_mocker
         }
 
         // Parse dimensions
-        obj.dimensions = parseDimensions(element, obj.type);
+        Eigen::Vector3d dimensions = parseDimensions(element, obj.type);
+        obj.dimensions = dimensions;
 
         // Parse world transform
-        parseWorldTransform(element, obj.position, obj.rotation_rpy);
+        Eigen::Vector3d position, rotation_rpy;
+        parseWorldTransform(element, position, rotation_rpy);
+        obj.position = position;
+        obj.rotation_rpy = rotation_rpy;
 
         // For MODEL type, try to get mesh filename
         if (obj.type == ObjectType::MODEL)

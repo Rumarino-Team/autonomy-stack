@@ -21,7 +21,7 @@ namespace detection_mocker
          * @return Vector of static objects
          * @throws std::runtime_error if file cannot be loaded or parsed
          */
-        static std::vector<StaticObject> parseStaticObjects(const std::string &scn_file_path);
+        static std::vector<StaticObject> parseStaticObjects(const std::string& scn_file_path);
 
         /**
          * @brief Parse camera configuration from robot scene file

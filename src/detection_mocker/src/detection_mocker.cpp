@@ -2,16 +2,18 @@
 #include <vision_msgs/msg/bounding_box3_d.hpp>
 #include <chrono>
 #include <functional>
+#include <cmath>
 
 using namespace std::chrono_literals;
 
 namespace detection_mocker
 {
-  DetectionMocker::DetectionMocker() : Node("detection_mocker"),
-                                       odom_received_(false),
-                                       camera_info_received_(false),
-                                       horizontal_fov_(0.0),
-                                       vertical_fov_(0.0)
+  DetectionMocker::DetectionMocker() 
+    : Node("detection_mocker"),
+      odom_received_(false),
+      fov_ready_(false),
+      horizontal_fov_(0.0),
+      vertical_fov_(0.0)
   {
     RCLCPP_INFO(this->get_logger(), "Initializing Detection Mocker node...");
 
@@ -39,17 +41,12 @@ namespace detection_mocker
         odometry_topic_, 10,
         std::bind(&DetectionMocker::odometryCallback, this, std::placeholders::_1));
 
-    camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        camera_info_topic_, 10,
-        std::bind(&DetectionMocker::cameraInfoCallback, this, std::placeholders::_1));
-
     // Create publisher
     map_pub_ = this->create_publisher<interfaces::msg::Map>(map_output_topic_, 10);
 
     // Create timer for periodic publishing
-    int timer_ms = static_cast<int>(1000.0 / publish_rate_hz_);
     timer_ = this->create_wall_timer(
-        std::chrono::milliseconds(timer_ms),
+        std::chrono::milliseconds(static_cast<int>(1000.0 / publish_rate_hz_)),
         std::bind(&DetectionMocker::publishMap, this));
 
     RCLCPP_INFO(this->get_logger(), "Detection Mocker initialized successfully!");
@@ -66,22 +63,18 @@ namespace detection_mocker
     this->declare_parameter("scn_file_path", "");
     this->declare_parameter("robot_scn_file_path", "");
     this->declare_parameter("odometry_topic", "/hydrus/odometry");
-    this->declare_parameter("camera_info_topic", "/hydrus/camera/camera_info");
     this->declare_parameter("map_output_topic", "/map");
     this->declare_parameter("publish_rate_hz", 10.0);
     this->declare_parameter("min_detection_distance", 0.1);
     this->declare_parameter("max_detection_distance", 50.0);
-    this->declare_parameter("debug_mode", false);
 
     scn_file_path_ = this->get_parameter("scn_file_path").as_string();
     robot_scn_file_path_ = this->get_parameter("robot_scn_file_path").as_string();
     odometry_topic_ = this->get_parameter("odometry_topic").as_string();
-    camera_info_topic_ = this->get_parameter("camera_info_topic").as_string();
     map_output_topic_ = this->get_parameter("map_output_topic").as_string();
     publish_rate_hz_ = this->get_parameter("publish_rate_hz").as_double();
     min_detection_distance_ = this->get_parameter("min_detection_distance").as_double();
     max_detection_distance_ = this->get_parameter("max_detection_distance").as_double();
-    debug_mode_ = this->get_parameter("debug_mode").as_bool();
 
     // Validate required parameters
     if (scn_file_path_.empty())
@@ -102,10 +95,23 @@ namespace detection_mocker
     static_objects_ = XMLParser::parseStaticObjects(scn_file_path_);
 
     // Parse camera configuration from robot scene
-    camera_config_ = XMLParser::parseCameraConfig(robot_scn_file_path_);
+    camera_config_ = std::make_unique<CameraConfig>(XMLParser::parseCameraConfig(robot_scn_file_path_));
 
-    // Pre-compute camera rotation matrix
-    camera_rotation_matrix_ = Transforms::rpyToRotationMatrix(camera_config_.rotation_rpy);
+    if (camera_config_->resolution_x > 0 && camera_config_->resolution_y > 0)
+    {
+      horizontal_fov_ = camera_config_->horizontal_fov_rad;
+      double aspect_ratio = static_cast<double>(camera_config_->resolution_y) /
+                            static_cast<double>(camera_config_->resolution_x);
+      vertical_fov_ = 2.0 * std::atan(std::tan(horizontal_fov_ / 2.0) * aspect_ratio);
+      fov_ready_ = true;
+      RCLCPP_INFO(this->get_logger(), "Camera specs loaded from scene file");
+      RCLCPP_INFO(this->get_logger(), "  - Resolution: %dx%d",
+                  camera_config_->resolution_x, camera_config_->resolution_y);
+      RCLCPP_INFO(this->get_logger(), "  - Horizontal FOV: %.1f degrees",
+                  horizontal_fov_ * 180.0 / M_PI);
+      RCLCPP_INFO(this->get_logger(), "  - Vertical FOV: %.1f degrees",
+                  vertical_fov_ * 180.0 / M_PI);
+    }
 
     RCLCPP_INFO(this->get_logger(), "Scene parsing complete!");
   }
@@ -115,42 +121,17 @@ namespace detection_mocker
     latest_odom_ = msg;
     odom_received_ = true;
 
-    if (debug_mode_ && !camera_info_received_)
-    {
-      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                           "Odometry received, waiting for camera info...");
-    }
-  }
-
-  void DetectionMocker::cameraInfoCallback(const sensor_msgs::msg::CameraInfo::SharedPtr msg)
-  {
-    latest_camera_info_ = msg;
-
-    // Calculate FOVs from camera intrinsics
-    horizontal_fov_ = FrustumCuller::calculateHorizontalFOV(*msg);
-    vertical_fov_ = FrustumCuller::calculateVerticalFOV(*msg);
-
-    if (!camera_info_received_)
-    {
-      camera_info_received_ = true;
-      RCLCPP_INFO(this->get_logger(), "Camera info received!");
-      RCLCPP_INFO(this->get_logger(), "  - Resolution: %dx%d", msg->width, msg->height);
-      RCLCPP_INFO(this->get_logger(), "  - Horizontal FOV: %.1f degrees",
-                  horizontal_fov_ * 180.0 / M_PI);
-      RCLCPP_INFO(this->get_logger(), "  - Vertical FOV: %.1f degrees",
-                  vertical_fov_ * 180.0 / M_PI);
-    }
   }
 
   void DetectionMocker::publishMap()
   {
     // Check if we have required data
-    if (!odom_received_ || !camera_info_received_)
+    if (!odom_received_ || !fov_ready_)
     {
       RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                           "Waiting for odometry and camera info... (odom: %s, cam: %s)",
+                           "Waiting for odometry and camera specs... (odom: %s, cam: %s)",
                            odom_received_ ? "OK" : "waiting",
-                           camera_info_received_ ? "OK" : "waiting");
+                           fov_ready_ ? "OK" : "waiting");
       return;
     }
 
@@ -184,8 +165,8 @@ namespace detection_mocker
           static_obj.position,
           robot_pos,
           robot_orient,
-          camera_config_.offset,
-          camera_rotation_matrix_);
+          camera_config_->offset,
+          getCameraRotationMatrix());
 
       // Check if object is visible in camera frustum
       if (frustum_culler_->isVisible(point_cam, horizontal_fov_, vertical_fov_))
@@ -197,26 +178,12 @@ namespace detection_mocker
 
         map_msg.objects.push_back(map_obj);
 
-        if (debug_mode_)
-        {
-          RCLCPP_DEBUG(this->get_logger(),
-                       "Visible: %s at (%.2f, %.2f, %.2f) -> cam(%.2f, %.2f, %.2f)",
-                       static_obj.name.c_str(),
-                       static_obj.position.x(), static_obj.position.y(), static_obj.position.z(),
-                       point_cam.x(), point_cam.y(), point_cam.z());
-        }
       }
     }
 
     // Publish map
     map_pub_->publish(map_msg);
 
-    if (debug_mode_)
-    {
-      RCLCPP_DEBUG(this->get_logger(),
-                   "Published map with %zu visible objects (out of %zu total)",
-                   map_msg.objects.size(), static_objects_.size());
-    }
   }
 
   Eigen::Vector3d DetectionMocker::getRobotPosition() const
@@ -246,7 +213,7 @@ namespace detection_mocker
 
   Eigen::Matrix3d DetectionMocker::getCameraRotationMatrix() const
   {
-    return camera_rotation_matrix_;
+    return Transforms::rpyToRotationMatrix(camera_config_->rotation_rpy);
   }
 
   int32_t DetectionMocker::classifyObject(const std::string &name) const
@@ -324,12 +291,3 @@ namespace detection_mocker
   }
 
 } // namespace detection_mocker
-
-int main(int argc, char **argv)
-{
-  rclcpp::init(argc, argv);
-  auto node = std::make_shared<detection_mocker::DetectionMocker>();
-  rclcpp::spin(node);
-  rclcpp::shutdown();
-  return 0;
-}
