@@ -48,6 +48,9 @@
 		<!-- used for dvl -->
 		<look name="green" rgb="0.0 0.2 0.0" roughness="0.1" metalness="0.1" />
 
+		<look name="white" rgb="0.95 0.95 0.95" roughness="0.3" metalness="0.0" />
+		<look name="red" rgb="0.9 0.0 0.0" roughness="0.3" metalness="0.0" />
+
 		<look name="gray" rgb="0.5 0.5 0.5" roughness="0.3" metalness="0.0" />
 		<look name="propeller" gray="1.0" roughness="0.3" />
 		<look name="gatetex" gray="1.0" roughness="0.3" texture="textures/gate.png" />
@@ -114,63 +117,63 @@
 	<static name="Pole1" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="white" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="1.5 5.0 0.45" />
 	</static>
 
 	<static name="Pole2" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="white" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="3.0 5.0 0.45" />
 	</static>
 
 	<static name="Pole3" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="white" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="4.5 5.0 0.45" />
 	</static>
 
 	<static name="Pole4" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="red" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="2.0 6.5 0.45" />
 	</static>
 
 	<static name="Pole5" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="red" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="3.5 6.5 0.45" />
 	</static>
 
 	<static name="Pole6" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="red" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="5.0 6.5 0.45" />
 	</static>
 
 	<static name="Pole7" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="white" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="1.5 8.0 0.45" />
 	</static>
 
 	<static name="Pole8" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="white" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="3.0 8.0 0.45" />
 	</static>
 
 	<static name="Pole9" type="cylinder">
 		<dimensions radius="0.0254" height="0.9" />
 		<material name="acrylic" />
-		<look name="clear" />
+		<look name="white" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="4.5 8.0 0.45" />
 	</static>
 
