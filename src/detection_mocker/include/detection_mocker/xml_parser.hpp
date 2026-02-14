@@ -31,6 +31,14 @@ namespace detection_mocker
          */
         static CameraConfig parseCameraConfig(const std::string &robot_scn_file_path);
 
+        /**
+         * @brief Compute map bounds from static objects
+         * @param objects Vector of static objects
+         * @param padding_factor Padding multiplier (default 1.1 = 10% padding)
+         * @return Map bounds
+         */
+        static MapBounds computeMapBounds(const std::vector<StaticObject> &objects, double padding_factor = 1.1);
+
     private:
         /**
          * @brief Parse a single <static> XML element

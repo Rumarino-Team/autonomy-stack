@@ -10,6 +10,17 @@ def generate_launch_description():
     env_file_name = LaunchConfiguration('env_file_name')
 
     return LaunchDescription([
+        # Node(
+        #     package='detection_mocker',
+        #     executable='detection_mocker',
+        #     parameters=[{
+        #         'scn_file_path': PathJoinSubstitution([FindPackageShare('controller_stonefish'), 'data', 'scenarios', env_file_name]),
+        #         'robot_scn_file_path': PathJoinSubstitution([FindPackageShare('controller_stonefish'), 'data', 'scenarios', 'hydrus_auv.scn']),
+        #         'odometry_topic': '/hydrus/odometry',
+        #         'map_output_topic': '/hydrus/map',
+        #         'publish_all_objects': True,
+        #     }],
+        # ),
         Node(
             package='mission_executor',
             executable='mission_executor',

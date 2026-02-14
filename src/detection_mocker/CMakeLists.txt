@@ -18,6 +18,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 # Find TinyXML2 (system library)
 find_package(PkgConfig REQUIRED)
@@ -43,6 +44,7 @@ ament_target_dependencies(detection_mocker_lib
   nav_msgs
   geometry_msgs
   vision_msgs
+  visualization_msgs
 )
 
 target_link_libraries(detection_mocker_lib Eigen3::Eigen ${TINYXML2_LIBRARIES})
@@ -50,14 +52,9 @@ target_link_libraries(detection_mocker_lib Eigen3::Eigen ${TINYXML2_LIBRARIES})
 # Main executable
 add_executable(detection_mocker src/main.cpp)
 target_link_libraries(detection_mocker detection_mocker_lib)
-ament_target_dependencies(detection_mocker rclcpp)
+ament_target_dependencies(detection_mocker rclcpp visualization_msgs)
 
-# Static map publisher (oneshot mode)
-add_executable(static_map_publisher src/static_map_publisher.cpp)
-target_link_libraries(static_map_publisher detection_mocker_lib)
-ament_target_dependencies(static_map_publisher rclcpp interfaces vision_msgs)
-
-install(TARGETS detection_mocker static_map_publisher
+install(TARGETS detection_mocker
   DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS detection_mocker_lib

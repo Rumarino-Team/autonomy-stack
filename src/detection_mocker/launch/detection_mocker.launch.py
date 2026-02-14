@@ -23,7 +23,8 @@ def generate_launch_description():
                 'map_output_topic': '/map',
                 'publish_rate_hz': 10.0,
                 'min_detection_distance': 0.1,
-                'max_detection_distance': 50.0
+                'max_detection_distance': 50.0,
+                'publish_all_objects': True
             }],
             remappings=[
                 # Add remappings if needed

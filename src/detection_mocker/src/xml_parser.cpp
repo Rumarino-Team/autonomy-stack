@@ -4,9 +4,12 @@
 #include <iostream>
 #include <map>
 #include <cmath>
+#include <fstream>
+#include <limits>
 
 namespace detection_mocker
 {
+
 
     std::vector<StaticObject> XMLParser::parseStaticObjects(const std::string &scn_file_path)
     {
@@ -180,6 +183,53 @@ namespace detection_mocker
         {
             throw std::runtime_error("Unknown object type: " + type);
         }
+        // GATE,
+        // BOUY,
+        // PATH,
+        // BIND,
+        // SHARK,
+        // SWORDFISH,
+
+        const char* cls_str = nullptr;
+        element->QueryStringAttribute("cls", &cls_str);
+        if(!cls_str)
+        {
+            // Default to PATH if cls attribute is missing
+            obj.cls = ClassType::PATH;
+        }
+        else
+        {
+            // Make This A Function when needed refactor.
+            std::string cls = std::string(cls_str);
+            if( cls == "gate" )
+            {
+                obj.cls = ClassType::GATE;
+            }
+            else if( cls == "bouy")
+            {
+                obj.cls = ClassType::BOUY;
+            }
+            else if( cls == "path")
+            {
+                obj.cls = ClassType::PATH;
+            }
+            else if( cls == "bind")
+            {
+                obj.cls = ClassType::BIND;
+            }
+            else if( cls == "shark")
+            {
+                obj.cls = ClassType::SHARK;
+            }
+            else if(cls =="swordfish"){
+                obj.cls = ClassType::SWORDFISH;
+            }
+            else
+            {
+                // Unknown class, default to PATH
+                obj.cls = ClassType::PATH;
+            }
+        }
 
         // Parse dimensions
         Eigen::Vector3d dimensions = parseDimensions(element, obj.type);
@@ -293,26 +343,70 @@ namespace detection_mocker
 
     Eigen::Vector3d XMLParser::getCustomMeshDimensions(const std::string &mesh_filename)
     {
-        // Lookup table for known meshes
-        static const std::map<std::string, Eigen::Vector3d> mesh_dims = {
-            {"models/hydrus_lowlegs.obj", Eigen::Vector3d(0.1, 0.75, 0.05)},
-            {"hydrus_lowlegs.obj", Eigen::Vector3d(0.1, 0.75, 0.05)},
-            // Add more known meshes here as needed
-        };
+        static std::map<std::string, Eigen::Vector3d> mesh_dims_cache;
 
-        // Search for filename in lookup table
-        for (const auto &[key, dims] : mesh_dims)
+        auto cached = mesh_dims_cache.find(mesh_filename);
+        if (cached != mesh_dims_cache.end())
         {
-            if (mesh_filename.find(key) != std::string::npos)
-            {
-                return dims;
-            }
+            return cached->second;
         }
 
-        // Default fallback for unknown meshes
-        std::cerr << "Warning: Unknown mesh '" << mesh_filename
-                  << "', using default bounding box (0.5m cube)" << std::endl;
-        return Eigen::Vector3d(0.5, 0.5, 0.5);
+        std::ifstream mesh_file(mesh_filename);
+        if (!mesh_file.is_open())
+        {
+            std::cerr << "Warning: Failed to open mesh '" << mesh_filename
+                      << "', using default bounding box (0.5m cube)" << std::endl;
+            Eigen::Vector3d fallback(0.5, 0.5, 0.5);
+            mesh_dims_cache.emplace(mesh_filename, fallback);
+            return fallback;
+        }
+
+        double min_x = std::numeric_limits<double>::infinity();
+        double min_y = std::numeric_limits<double>::infinity();
+        double min_z = std::numeric_limits<double>::infinity();
+        double max_x = -std::numeric_limits<double>::infinity();
+        double max_y = -std::numeric_limits<double>::infinity();
+        double max_z = -std::numeric_limits<double>::infinity();
+
+        std::string line;
+        bool has_vertex = false;
+        while (std::getline(mesh_file, line))
+        {
+            if (line.size() < 2 || line[0] != 'v' || line[1] != ' ')
+            {
+                continue;
+            }
+
+            std::istringstream iss(line.substr(2));
+            double x = 0.0;
+            double y = 0.0;
+            double z = 0.0;
+            if (!(iss >> x >> y >> z))
+            {
+                continue;
+            }
+
+            has_vertex = true;
+            min_x = std::min(min_x, x);
+            min_y = std::min(min_y, y);
+            min_z = std::min(min_z, z);
+            max_x = std::max(max_x, x);
+            max_y = std::max(max_y, y);
+            max_z = std::max(max_z, z);
+        }
+
+        if (!has_vertex)
+        {
+            std::cerr << "Warning: No vertices found in mesh '" << mesh_filename
+                      << "', using default bounding box (0.5m cube)" << std::endl;
+            Eigen::Vector3d fallback(0.5, 0.5, 0.5);
+            mesh_dims_cache.emplace(mesh_filename, fallback);
+            return fallback;
+        }
+
+        Eigen::Vector3d dims(max_x - min_x, max_y - min_y, max_z - min_z);
+        mesh_dims_cache.emplace(mesh_filename, dims);
+        return dims;
     }
 
     Eigen::Vector3d XMLParser::parseVector3(const std::string &str)
@@ -324,6 +418,69 @@ namespace detection_mocker
             throw std::runtime_error("Failed to parse vector3: " + str);
         }
         return Eigen::Vector3d(x, y, z);
+    }
+
+    MapBounds XMLParser::computeMapBounds(const std::vector<StaticObject> &objects, double padding_factor)
+    {
+        if (objects.empty())
+        {
+            // Return default bounds if no objects
+            MapBounds bounds;
+            bounds.center = Eigen::Vector3d::Zero();
+            bounds.size = Eigen::Vector3d(10.0, 10.0, 10.0);
+            return bounds;
+        }
+
+        double min_x = std::numeric_limits<double>::infinity();
+        double min_y = std::numeric_limits<double>::infinity();
+        double min_z = std::numeric_limits<double>::infinity();
+        double max_x = -std::numeric_limits<double>::infinity();
+        double max_y = -std::numeric_limits<double>::infinity();
+        double max_z = -std::numeric_limits<double>::infinity();
+
+        for (const auto &obj : objects)
+        {
+            // Skip planes as they don't contribute to meaningful bounds
+            if (obj.type == ObjectType::PLANE)
+            {
+                continue;
+            }
+
+            // Get object extents (half-sizes)
+            Eigen::Vector3d half_size = obj.dimensions * 0.5;
+            if (obj.type == ObjectType::CYLINDER)
+            {
+                // For cylinder: dimensions = (radius, height, 0)
+                half_size = Eigen::Vector3d(obj.dimensions.x(), obj.dimensions.x(), obj.dimensions.y() * 0.5);
+            }
+
+            // Compute object min/max bounds (simple AABB, ignoring rotation)
+            Eigen::Vector3d obj_min = obj.position - half_size;
+            Eigen::Vector3d obj_max = obj.position + half_size;
+
+            min_x = std::min(min_x, obj_min.x());
+            min_y = std::min(min_y, obj_min.y());
+            min_z = std::min(min_z, obj_min.z());
+            max_x = std::max(max_x, obj_max.x());
+            max_y = std::max(max_y, obj_max.y());
+            max_z = std::max(max_z, obj_max.z());
+        }
+
+        // Compute center and size
+        Eigen::Vector3d center(
+            (min_x + max_x) * 0.5,
+            (min_y + max_y) * 0.5,
+            (min_z + max_z) * 0.5);
+
+        Eigen::Vector3d size(
+            (max_x - min_x) * padding_factor,
+            (max_y - min_y) * padding_factor,
+            (max_z - min_z) * padding_factor);
+
+        MapBounds bounds;
+        bounds.center = center;
+        bounds.size = size;
+        return bounds;
     }
 
 } // namespace detection_mocker

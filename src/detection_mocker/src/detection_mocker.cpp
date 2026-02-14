@@ -1,5 +1,6 @@
 #include "detection_mocker/detection_mocker.hpp"
 #include <vision_msgs/msg/bounding_box3_d.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 #include <chrono>
 #include <functional>
 #include <cmath>
@@ -13,7 +14,8 @@ namespace detection_mocker
       odom_received_(false),
       fov_ready_(false),
       horizontal_fov_(0.0),
-      vertical_fov_(0.0)
+      vertical_fov_(0.0),
+      markers_published_(false)
   {
     RCLCPP_INFO(this->get_logger(), "Initializing Detection Mocker node...");
 
@@ -41,8 +43,17 @@ namespace detection_mocker
         odometry_topic_, 10,
         std::bind(&DetectionMocker::odometryCallback, this, std::placeholders::_1));
 
-    // Create publisher
+    // Create publishers
     map_pub_ = this->create_publisher<interfaces::msg::Map>(map_output_topic_, 10);
+    
+    // Create marker publisher with transient local for static visualization
+    rclcpp::QoS marker_qos(10);
+    marker_qos.transient_local();
+    marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+        map_output_topic_ + "_markers", marker_qos);
+
+    // Publish static markers once (after marker_pub_ is created)
+    publishStaticMarkers();
 
     // Create timer for periodic publishing
     timer_ = this->create_wall_timer(
@@ -67,6 +78,7 @@ namespace detection_mocker
     this->declare_parameter("publish_rate_hz", 10.0);
     this->declare_parameter("min_detection_distance", 0.1);
     this->declare_parameter("max_detection_distance", 50.0);
+    this->declare_parameter("publish_all_objects", false);
 
     scn_file_path_ = this->get_parameter("scn_file_path").as_string();
     robot_scn_file_path_ = this->get_parameter("robot_scn_file_path").as_string();
@@ -75,8 +87,8 @@ namespace detection_mocker
     publish_rate_hz_ = this->get_parameter("publish_rate_hz").as_double();
     min_detection_distance_ = this->get_parameter("min_detection_distance").as_double();
     max_detection_distance_ = this->get_parameter("max_detection_distance").as_double();
+    publish_all_objects_ = this->get_parameter("publish_all_objects").as_bool();
 
-    // Validate required parameters
     if (scn_file_path_.empty())
     {
       throw std::runtime_error("Required parameter 'scn_file_path' not set!");
@@ -113,6 +125,12 @@ namespace detection_mocker
                   vertical_fov_ * 180.0 / M_PI);
     }
 
+    // Compute map bounds from static objects
+    map_bounds_ = XMLParser::computeMapBounds(static_objects_);
+    RCLCPP_INFO(this->get_logger(), "Map bounds - Center: (%.2f, %.2f, %.2f), Size: (%.2f, %.2f, %.2f)",
+                map_bounds_.center.x(), map_bounds_.center.y(), map_bounds_.center.z(),
+                map_bounds_.size.x(), map_bounds_.size.y(), map_bounds_.size.z());
+
     RCLCPP_INFO(this->get_logger(), "Scene parsing complete!");
   }
 
@@ -137,15 +155,14 @@ namespace detection_mocker
 
     interfaces::msg::Map map_msg;
 
-    // Set map bounds (covering entire simulation area based on hydrus_env.scn)
-    // Objects range roughly: x[-3, 20], y[0, 2], z[0, 3]
-    map_msg.map_bounds.center.position.x = 8.5;
-    map_msg.map_bounds.center.position.y = 1.0;
-    map_msg.map_bounds.center.position.z = 1.5;
+    // Set map bounds from computed AABB
+    map_msg.map_bounds.center.position.x = map_bounds_.center.x();
+    map_msg.map_bounds.center.position.y = map_bounds_.center.y();
+    map_msg.map_bounds.center.position.z = map_bounds_.center.z();
     map_msg.map_bounds.center.orientation.w = 1.0;
-    map_msg.map_bounds.size.x = 25.0;
-    map_msg.map_bounds.size.y = 3.0;
-    map_msg.map_bounds.size.z = 4.0;
+    map_msg.map_bounds.size.x = map_bounds_.size.x();
+    map_msg.map_bounds.size.y = map_bounds_.size.y();
+    map_msg.map_bounds.size.z = map_bounds_.size.z();
 
     // Get robot pose
     Eigen::Vector3d robot_pos = getRobotPosition();
@@ -166,18 +183,52 @@ namespace detection_mocker
           robot_pos,
           robot_orient,
           camera_config_->offset,
-          getCameraRotationMatrix());
+          Transforms::rpyToRotationMatrix(camera_config_->rotation_rpy));
 
       // Check if object is visible in camera frustum
-      if (frustum_culler_->isVisible(point_cam, horizontal_fov_, vertical_fov_))
+      if (publish_all_objects_ || frustum_culler_->isVisible(point_cam, horizontal_fov_, vertical_fov_))
       {
         // Create MapObject
         interfaces::msg::MapObject map_obj;
-        map_obj.cls = classifyObject(static_obj.name);
-        map_obj.bbox = objectToBoundingBox(static_obj);
+        map_obj.cls = static_cast<int32_t>(static_obj.cls);
 
+        // Create bounding box
+        vision_msgs::msg::BoundingBox3D bbox;
+        bbox.center.position.x = static_obj.position.x();
+        bbox.center.position.y = static_obj.position.y();
+        bbox.center.position.z = static_obj.position.z();
+
+        Eigen::Quaterniond quat = Transforms::rpyToQuaternion(static_obj.rotation_rpy);
+        bbox.center.orientation.x = quat.x();
+        bbox.center.orientation.y = quat.y();
+        bbox.center.orientation.z = quat.z();
+        bbox.center.orientation.w = quat.w();
+
+        // Set size based on object type
+        switch (static_obj.type)
+        {
+        case ObjectType::BOX:
+        case ObjectType::MODEL:
+          bbox.size.x = static_obj.dimensions.x();
+          bbox.size.y = static_obj.dimensions.y();
+          bbox.size.z = static_obj.dimensions.z();
+          break;
+
+        case ObjectType::CYLINDER:
+          bbox.size.x = 2.0 * static_obj.dimensions.x();
+          bbox.size.y = 2.0 * static_obj.dimensions.x();
+          bbox.size.z = static_obj.dimensions.y();
+          break;
+
+        case ObjectType::PLANE:
+          bbox.size.x = 100.0;
+          bbox.size.y = 100.0;
+          bbox.size.z = 0.1;
+          break;
+        }
+
+        map_obj.bbox = bbox;
         map_msg.objects.push_back(map_obj);
-
       }
     }
 
@@ -211,83 +262,112 @@ namespace detection_mocker
         latest_odom_->pose.pose.orientation.z);
   }
 
-  Eigen::Matrix3d DetectionMocker::getCameraRotationMatrix() const
+  void DetectionMocker::publishStaticMarkers()
   {
-    return Transforms::rpyToRotationMatrix(camera_config_->rotation_rpy);
-  }
-
-  int32_t DetectionMocker::classifyObject(const std::string &name) const
-  {
-    // Classification based on mission_executor ObjectCls enum
-    // 0: Cube, 1: Rectangle/Gate, 2: Marker, 3: Unknown
-
-    if (name == "Box")
+    if (markers_published_)
     {
-      return 0; // Cube
-    }
-    else if (name.find("Gate") != std::string::npos)
-    {
-      return 1; // Rectangle/Gate
-    }
-    else if (name == "Marker")
-    {
-      return 2; // Marker/Cylinder
-    }
-    else if (name == "Ground")
-    {
-      return -1; // Should be filtered out, but just in case
+      return; // Already published
     }
 
-    return 3; // Unknown
-  }
+    visualization_msgs::msg::MarkerArray marker_array;
+    int marker_id = 0;
 
-  vision_msgs::msg::BoundingBox3D DetectionMocker::objectToBoundingBox(const StaticObject &obj) const
-  {
-    vision_msgs::msg::BoundingBox3D bbox;
-
-    // Set center position
-    bbox.center.position.x = obj.position.x();
-    bbox.center.position.y = obj.position.y();
-    bbox.center.position.z = obj.position.z();
-
-    // Set orientation from RPY
-    Eigen::Quaterniond quat = Transforms::rpyToQuaternion(obj.rotation_rpy);
-    bbox.center.orientation.x = quat.x();
-    bbox.center.orientation.y = quat.y();
-    bbox.center.orientation.z = quat.z();
-    bbox.center.orientation.w = quat.w();
-
-    // Set size based on object type
-    switch (obj.type)
+    for (const auto &static_obj : static_objects_)
     {
-    case ObjectType::BOX:
-      bbox.size.x = obj.dimensions.x();
-      bbox.size.y = obj.dimensions.y();
-      bbox.size.z = obj.dimensions.z();
-      break;
+      // Skip ground plane
+      if (static_obj.type == ObjectType::PLANE)
+      {
+        continue;
+      }
 
-    case ObjectType::CYLINDER:
-      // Approximate cylinder as bounding box
-      bbox.size.x = 2.0 * obj.dimensions.x(); // diameter (2 * radius)
-      bbox.size.y = 2.0 * obj.dimensions.x(); // diameter (2 * radius)
-      bbox.size.z = obj.dimensions.y();       // height
-      break;
+      visualization_msgs::msg::Marker marker;
+      marker.header.frame_id = "world_ned";
+      marker.header.stamp = this->now();
+      marker.ns = "static_objects";
+      marker.id = marker_id++;
+      marker.type = visualization_msgs::msg::Marker::CUBE;
+      marker.action = visualization_msgs::msg::Marker::ADD;
 
-    case ObjectType::MODEL:
-      bbox.size.x = obj.dimensions.x();
-      bbox.size.y = obj.dimensions.y();
-      bbox.size.z = obj.dimensions.z();
-      break;
+      // Set position
+      marker.pose.position.x = static_obj.position.x();
+      marker.pose.position.y = static_obj.position.y();
+      marker.pose.position.z = static_obj.position.z();
 
-    case ObjectType::PLANE:
-      // Should never reach here
-      bbox.size.x = 100.0;
-      bbox.size.y = 100.0;
-      bbox.size.z = 0.1;
-      break;
+      // Set orientation
+      Eigen::Quaterniond quat = Transforms::rpyToQuaternion(static_obj.rotation_rpy);
+      marker.pose.orientation.x = quat.x();
+      marker.pose.orientation.y = quat.y();
+      marker.pose.orientation.z = quat.z();
+      marker.pose.orientation.w = quat.w();
+
+      // Set scale based on object type
+      switch (static_obj.type)
+      {
+      case ObjectType::BOX:
+      case ObjectType::MODEL:
+        marker.scale.x = static_obj.dimensions.x();
+        marker.scale.y = static_obj.dimensions.y();
+        marker.scale.z = static_obj.dimensions.z();
+        break;
+
+      case ObjectType::CYLINDER:
+        marker.type = visualization_msgs::msg::Marker::CYLINDER;
+        marker.scale.x = 2.0 * static_obj.dimensions.x();
+        marker.scale.y = 2.0 * static_obj.dimensions.x();
+        marker.scale.z = static_obj.dimensions.y();
+        break;
+
+      case ObjectType::PLANE:
+        // Should not reach here
+        continue;
+      }
+
+      // Set color based on class type
+      marker.color.a = 0.5; // Semi-transparent
+      switch (static_obj.cls)
+      {
+      case ClassType::GATE:
+        marker.color.r = 1.0;
+        marker.color.g = 0.0;
+        marker.color.b = 0.0;
+        break;
+      case ClassType::BOUY:
+        marker.color.r = 0.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+        break;
+      case ClassType::PATH:
+        marker.color.r = 0.0;
+        marker.color.g = 0.0;
+        marker.color.b = 1.0;
+        break;
+      case ClassType::BIND:
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 0.0;
+        break;
+      case ClassType::SHARK:
+        marker.color.r = 0.5;
+        marker.color.g = 0.0;
+        marker.color.b = 0.5;
+        break;
+      case ClassType::SWORDFISH:
+        marker.color.r = 0.0;
+        marker.color.g = 0.5;
+        marker.color.b = 0.5;
+        break;
+      }
+
+      marker.lifetime = rclcpp::Duration::from_seconds(0); // Persistent
+
+      marker_array.markers.push_back(marker);
     }
 
-    return bbox;
+    // Publish markers
+    marker_pub_->publish(marker_array);
+    markers_published_ = true;
+    
+    RCLCPP_INFO(this->get_logger(), "Published %zu static object markers", marker_array.markers.size());
   }
 
 } // namespace detection_mocker

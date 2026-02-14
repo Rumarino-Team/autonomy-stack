@@ -38,13 +38,6 @@ namespace detection_mocker
          */
         static double calculateHorizontalFOV(const sensor_msgs::msg::CameraInfo &camera_info);
 
-        /**
-         * @brief Calculate vertical FOV from camera intrinsics
-         * @param camera_info Camera info message
-         * @return Vertical FOV in radians
-         */
-        static double calculateVerticalFOV(const sensor_msgs::msg::CameraInfo &camera_info);
-
     private:
         double min_distance_;
         double max_distance_;

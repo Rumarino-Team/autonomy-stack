@@ -22,36 +22,11 @@ Main node that publishes detected objects based on camera frustum culling.
 - `publish_rate_hz` (double, default: 10.0): Publishing rate
 - `min_detection_distance` (double, default: 0.1): Minimum detection range (m)
 - `max_detection_distance` (double, default: 50.0): Maximum detection range (m)
+- `publish_all_objects` (bool, default: false): Bypass frustum culling for debugging
 
 **Launch:**
 ```bash
 ros2 launch detection_mocker detection_mocker.launch.py
-```
-
-### 2. static_map_publisher
-
-Publishes all static objects from scene file as a complete map (no frustum culling).
-
-**Published Topics:**
-- `map_output_topic` (interfaces/Map): All static objects from scene
-
-**Parameters:**
-- `scn_file_path` (string): Path to environment .scn file
-- `map_output_topic` (string, default: "/map"): Output map topic
-- `publish_once` (bool, default: false): Publish once and keep spinning vs continuous
-- `publish_rate_hz` (double, default: 1.0): Publishing rate (if not publish_once)
-
-**Launch:**
-```bash
-ros2 launch detection_mocker static_map_publisher.launch.py
-```
-
-**Direct run (one-shot mode):**
-```bash
-ros2 run detection_mocker static_map_publisher --ros-args \
-  -p scn_file_path:=/path/to/scene.scn \
-  -p map_output_topic:=/static_map \
-  -p publish_once:=true
 ```
 
 ## Object Classification

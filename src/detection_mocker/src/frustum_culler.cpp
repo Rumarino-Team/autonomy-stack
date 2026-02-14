@@ -41,36 +41,4 @@ namespace detection_mocker
         return true;
     }
 
-    double FrustumCuller::calculateHorizontalFOV(const sensor_msgs::msg::CameraInfo &camera_info)
-    {
-        // Calculate FOV from camera intrinsics
-        // K[0] = fx (focal length in x)
-        // K[2] = cx (principal point x)
-        // FOV = 2 * atan(width / (2 * fx))
-        double fx = camera_info.k[0];
-        if (fx == 0.0)
-        {
-            // Uncalibrated camera, return default (60 degrees)
-            return 60.0 * M_PI / 180.0;
-        }
-        return 2.0 * std::atan(camera_info.width / (2.0 * fx));
-    }
-
-    double FrustumCuller::calculateVerticalFOV(const sensor_msgs::msg::CameraInfo &camera_info)
-    {
-        // Calculate FOV from camera intrinsics
-        // K[4] = fy (focal length in y)
-        // K[5] = cy (principal point y)
-        // FOV = 2 * atan(height / (2 * fy))
-        double fy = camera_info.k[4];
-        if (fy == 0.0)
-        {
-            // Uncalibrated camera, calculate from aspect ratio and horizontal FOV
-            double hfov = calculateHorizontalFOV(camera_info);
-            double aspect_ratio = static_cast<double>(camera_info.height) / camera_info.width;
-            return 2.0 * std::atan(std::tan(hfov / 2.0) * aspect_ratio);
-        }
-        return 2.0 * std::atan(camera_info.height / (2.0 * fy));
-    }
-
 } // namespace detection_mocker

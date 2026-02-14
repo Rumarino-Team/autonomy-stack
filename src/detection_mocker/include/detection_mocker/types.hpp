@@ -20,12 +20,27 @@ namespace detection_mocker
     };
 
     /**
+     * @brief The Classifer Class Types from Vision.
+     */
+    enum class ClassType
+    {
+        GATE,
+        BOUY,
+        PATH,
+        BIND,
+        SHARK,
+        SWORDFISH,
+
+    };
+
+    /**
      * @brief Static object parsed from .scn file
      */
     struct StaticObject
     {
         std::string name;
         ObjectType type;
+        ClassType cls;
         Eigen::Vector3d position;
         Eigen::Vector3d rotation_rpy;  // Roll, pitch, yaw
         Eigen::Vector3d dimensions;
@@ -42,6 +57,15 @@ namespace detection_mocker
         int resolution_x = 0;            // Image width in pixels
         int resolution_y = 0;            // Image height in pixels
         double horizontal_fov_rad = 0.0; // Horizontal FOV in radians
+    };
+
+    /**
+     * @brief Map bounds computed from static objects
+     */
+    struct MapBounds
+    {
+        Eigen::Vector3d center;
+        Eigen::Vector3d size;
     };
 
 } // namespace detection_mocker

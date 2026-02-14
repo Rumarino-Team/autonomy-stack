@@ -5,6 +5,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <interfaces/msg/map.hpp>
 #include <interfaces/msg/map_object.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <vector>
@@ -35,17 +36,17 @@ private:
     // Helper methods
     Eigen::Vector3d getRobotPosition() const;
     Eigen::Quaterniond getRobotOrientation() const;
-    Eigen::Matrix3d getCameraRotationMatrix() const;
-    int32_t classifyObject(const std::string& name) const;
-    vision_msgs::msg::BoundingBox3D objectToBoundingBox(const StaticObject& obj) const;
+    void publishStaticMarkers();
 
     // Parsed static data
     std::vector<StaticObject> static_objects_;
     std::unique_ptr<CameraConfig> camera_config_;
+    MapBounds map_bounds_;
 
     // ROS interfaces
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Publisher<interfaces::msg::Map>::SharedPtr map_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     // Latest sensor data
@@ -54,6 +55,7 @@ private:
     // State flags
     bool odom_received_;
     bool fov_ready_;
+    bool markers_published_;
 
     // Camera parameters
     double horizontal_fov_;
@@ -70,6 +72,7 @@ private:
     double publish_rate_hz_;
     double min_detection_distance_;
     double max_detection_distance_;
+    bool publish_all_objects_;
 };
 
 }  // namespace detection_mocker
