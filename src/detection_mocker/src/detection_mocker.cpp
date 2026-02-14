@@ -13,6 +13,7 @@ namespace detection_mocker
     : Node("detection_mocker"),
       odom_received_(false),
       fov_ready_(false),
+      static_map_published_(false),
       horizontal_fov_(0.0),
       vertical_fov_(0.0),
       markers_published_(false)
@@ -44,7 +45,9 @@ namespace detection_mocker
         std::bind(&DetectionMocker::odometryCallback, this, std::placeholders::_1));
 
     // Create publishers
-    map_pub_ = this->create_publisher<interfaces::msg::Map>(map_output_topic_, 10);
+    rclcpp::QoS map_qos(10);
+    map_qos.transient_local();
+    map_pub_ = this->create_publisher<interfaces::msg::Map>(map_output_topic_, map_qos);
     
     // Create marker publisher with transient local for static visualization
     rclcpp::QoS marker_qos(10);
@@ -143,11 +146,17 @@ namespace detection_mocker
 
   void DetectionMocker::publishMap()
   {
+    if (publish_all_objects_)
+    {
+      publishStaticMap();
+      return;
+    }
+
     // Check if we have required data
     if (!odom_received_ || !fov_ready_)
     {
       RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                           "Waiting for odometry and camera specs... (odom: %s, cam: %s)",
+                           "Waiting for required data... (odom: %s, cam: %s)",
                            odom_received_ ? "OK" : "waiting",
                            fov_ready_ ? "OK" : "waiting");
       return;
@@ -164,7 +173,6 @@ namespace detection_mocker
     map_msg.map_bounds.size.y = map_bounds_.size.y();
     map_msg.map_bounds.size.z = map_bounds_.size.z();
 
-    // Get robot pose
     Eigen::Vector3d robot_pos = getRobotPosition();
     Eigen::Quaterniond robot_orient = getRobotOrientation();
 
@@ -186,7 +194,7 @@ namespace detection_mocker
           Transforms::rpyToRotationMatrix(camera_config_->rotation_rpy));
 
       // Check if object is visible in camera frustum
-      if (publish_all_objects_ || frustum_culler_->isVisible(point_cam, horizontal_fov_, vertical_fov_))
+      if (frustum_culler_->isVisible(point_cam, horizontal_fov_, vertical_fov_))
       {
         // Create MapObject
         interfaces::msg::MapObject map_obj;
@@ -235,6 +243,78 @@ namespace detection_mocker
     // Publish map
     map_pub_->publish(map_msg);
 
+  }
+
+  void DetectionMocker::publishStaticMap()
+  {
+    if (static_map_published_)
+    {
+      return; // Already published
+    }
+
+    interfaces::msg::Map map_msg;
+
+    // Set map bounds from computed AABB
+    map_msg.map_bounds.center.position.x = map_bounds_.center.x();
+    map_msg.map_bounds.center.position.y = map_bounds_.center.y();
+    map_msg.map_bounds.center.position.z = map_bounds_.center.z();
+    map_msg.map_bounds.center.orientation.w = 1.0;
+    map_msg.map_bounds.size.x = map_bounds_.size.x();
+    map_msg.map_bounds.size.y = map_bounds_.size.y();
+    map_msg.map_bounds.size.z = map_bounds_.size.z();
+
+    for (const auto &static_obj : static_objects_)
+    {
+      // Skip ground plane
+      if (static_obj.type == ObjectType::PLANE)
+      {
+        continue;
+      }
+
+      interfaces::msg::MapObject map_obj;
+      map_obj.cls = static_cast<int32_t>(static_obj.cls);
+
+      vision_msgs::msg::BoundingBox3D bbox;
+      bbox.center.position.x = static_obj.position.x();
+      bbox.center.position.y = static_obj.position.y();
+      bbox.center.position.z = static_obj.position.z();
+
+      Eigen::Quaterniond quat = Transforms::rpyToQuaternion(static_obj.rotation_rpy);
+      bbox.center.orientation.x = quat.x();
+      bbox.center.orientation.y = quat.y();
+      bbox.center.orientation.z = quat.z();
+      bbox.center.orientation.w = quat.w();
+
+      switch (static_obj.type)
+      {
+      case ObjectType::BOX:
+      case ObjectType::MODEL:
+        bbox.size.x = static_obj.dimensions.x();
+        bbox.size.y = static_obj.dimensions.y();
+        bbox.size.z = static_obj.dimensions.z();
+        break;
+
+      case ObjectType::CYLINDER:
+        bbox.size.x = 2.0 * static_obj.dimensions.x();
+        bbox.size.y = 2.0 * static_obj.dimensions.x();
+        bbox.size.z = static_obj.dimensions.y();
+        break;
+
+      case ObjectType::PLANE:
+        bbox.size.x = 100.0;
+        bbox.size.y = 100.0;
+        bbox.size.z = 0.1;
+        break;
+      }
+
+      map_obj.bbox = bbox;
+      map_msg.objects.push_back(map_obj);
+    }
+
+    map_pub_->publish(map_msg);
+    static_map_published_ = true;
+
+    RCLCPP_INFO(this->get_logger(), "Published static map with %zu objects", map_msg.objects.size());
   }
 
   Eigen::Vector3d DetectionMocker::getRobotPosition() const

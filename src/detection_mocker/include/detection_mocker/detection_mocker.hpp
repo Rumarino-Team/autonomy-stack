@@ -36,6 +36,7 @@ private:
     // Helper methods
     Eigen::Vector3d getRobotPosition() const;
     Eigen::Quaterniond getRobotOrientation() const;
+    void publishStaticMap();
     void publishStaticMarkers();
 
     // Parsed static data
@@ -55,6 +56,7 @@ private:
     // State flags
     bool odom_received_;
     bool fov_ready_;
+    bool static_map_published_;
     bool markers_published_;
 
     // Camera parameters
