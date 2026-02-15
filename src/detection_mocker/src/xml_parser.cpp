@@ -183,51 +183,35 @@ namespace detection_mocker
         {
             throw std::runtime_error("Unknown object type: " + type);
         }
-        // GATE,
-        // BOUY,
-        // PATH,
-        // BIND,
-        // SHARK,
-        // SWORDFISH,
+
 
         const char* cls_str = nullptr;
         element->QueryStringAttribute("cls", &cls_str);
         if(!cls_str)
         {
             // Default to PATH if cls attribute is missing
-            obj.cls = ClassType::PATH;
+            obj.cls = ClassType::OTHER;
         }
         else
         {
-            // Make This A Function when needed refactor.
+            // TODO: Make This A Function if More Classes Are Added.
             std::string cls = std::string(cls_str);
             if( cls == "gate" )
             {
                 obj.cls = ClassType::GATE;
             }
-            else if( cls == "bouy")
-            {
-                obj.cls = ClassType::BOUY;
-            }
-            else if( cls == "path")
-            {
-                obj.cls = ClassType::PATH;
-            }
-            else if( cls == "bind")
-            {
-                obj.cls = ClassType::BIND;
-            }
-            else if( cls == "shark")
-            {
-                obj.cls = ClassType::SHARK;
-            }
-            else if(cls =="swordfish"){
-                obj.cls = ClassType::SWORDFISH;
-            }
+           else if(cls == "cube"){
+            obj.cls = ClassType::CUBE;
+           }
+           else if(cls == "shark"){
+            obj.cls  = ClassType::SHARK;
+           }
+           else if(cls == "rectangle"){
+            obj.cls  = ClassType::RECTANGLE;
+           }
             else
             {
-                // Unknown class, default to PATH
-                obj.cls = ClassType::PATH;
+                obj.cls = ClassType::OTHER;
             }
         }
 

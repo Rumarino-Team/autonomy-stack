@@ -371,7 +371,10 @@ namespace detection_mocker
       // Set position
       marker.pose.position.x = static_obj.position.x();
       marker.pose.position.y = static_obj.position.y();
-      marker.pose.position.z = static_obj.position.z();
+      marker.pose.position.z = static_obj.position.z();// The z position in stonefish is the negated. 
+                                                        // This is for mathching the simulator coordinates.
+
+
 
       // Set orientation
       Eigen::Quaterniond quat = Transforms::rpyToQuaternion(static_obj.rotation_rpy);
@@ -411,28 +414,23 @@ namespace detection_mocker
         marker.color.g = 0.0;
         marker.color.b = 0.0;
         break;
-      case ClassType::BOUY:
+      case ClassType::CUBE:
         marker.color.r = 0.0;
         marker.color.g = 1.0;
         marker.color.b = 0.0;
         break;
-      case ClassType::PATH:
+      case ClassType::RECTANGLE:
         marker.color.r = 0.0;
+        marker.color.g = 1.0;
+        marker.color.b = 1.0;
+        break;
+      case ClassType::OTHER:
+        marker.color.r = 1.0;
         marker.color.g = 0.0;
         marker.color.b = 1.0;
         break;
-      case ClassType::BIND:
-        marker.color.r = 1.0;
-        marker.color.g = 1.0;
-        marker.color.b = 0.0;
-        break;
-      case ClassType::SHARK:
+      default:
         marker.color.r = 0.5;
-        marker.color.g = 0.0;
-        marker.color.b = 0.5;
-        break;
-      case ClassType::SWORDFISH:
-        marker.color.r = 0.0;
         marker.color.g = 0.5;
         marker.color.b = 0.5;
         break;

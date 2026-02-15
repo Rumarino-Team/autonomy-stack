@@ -24,14 +24,14 @@ namespace detection_mocker
      */
     enum class ClassType
     {
-        GATE,
-        BOUY,
-        PATH,
-        BIND,
-        SHARK,
-        SWORDFISH,
+        CUBE = 1,
+        RECTANGLE=2,
+        GATE=3,
+        SHARK=3,
+        OTHER=4,
 
     };
+
 
     /**
      * @brief Static object parsed from .scn file
