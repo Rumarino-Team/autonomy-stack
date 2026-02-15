@@ -371,10 +371,7 @@ namespace detection_mocker
       // Set position
       marker.pose.position.x = static_obj.position.x();
       marker.pose.position.y = static_obj.position.y();
-      marker.pose.position.z = static_obj.position.z();// The z position in stonefish is the negated. 
-                                                        // This is for mathching the simulator coordinates.
-
-
+      marker.pose.position.z = static_obj.position.z();
 
       // Set orientation
       Eigen::Quaterniond quat = Transforms::rpyToQuaternion(static_obj.rotation_rpy);

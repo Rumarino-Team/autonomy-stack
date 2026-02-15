@@ -257,6 +257,11 @@ namespace detection_mocker
             {
                 return Eigen::Vector3d::Zero(); // Planes don't have dimensions
             }
+            if (type == ObjectType::MODEL)
+            {
+                // Models typically define geometry via <physical><mesh> and may omit <dimensions>
+                return Eigen::Vector3d(0.5, 0.5, 0.5); // Default, replaced by mesh lookup when available
+            }
             throw std::runtime_error("Missing dimensions element");
         }
 
