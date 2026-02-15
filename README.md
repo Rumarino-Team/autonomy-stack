@@ -85,7 +85,9 @@ sudo apt install -y ros-jazzy-desktop \
     libopencv-dev \
     libssl-dev \
     libboost-all-dev \
-    libepoxy-dev
+    libepoxy-dev \
+    libtinyxml2-dev \
+    pkg-config
 ```
 
 ### Install Stonefish Simulator
@@ -110,7 +112,7 @@ cd ~/ros2_ws/rumarino-ros2-jazzy
 source /opt/ros/jazzy/setup.bash
 
 # Build packages
-colcon build --packages-select interfaces bringup Stonefish stonefish_ros2 controller_stonefish mission_executor
+colcon build --packages-select interfaces bringup Stonefish stonefish_ros2 controller_stonefish  detection_mocker mission_executor
 
 # Source the workspace
 source install/setup.bash
