@@ -8,7 +8,7 @@ mod missions;
 mod navigation;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwap;
@@ -21,6 +21,9 @@ type Vector8<T> = Vector<T, U8, ArrayStorage<T, 8, 1>>;
 use parry3d_f64::shape::Segment;
 use r2r::{Node, ParameterValue, QosProfile};
 use tokio::sync::Notify;
+use tokio::signal::unix::{signal, SignalKind};
+use tokio::time::timeout;
+use futures::lock::Mutex;
 
 #[derive(Clone, Copy, Debug)]
 struct Pose {
@@ -46,6 +49,8 @@ struct MissionExecutor {
     pub new_objects: Notify,
     pub pose: ArcSwap<Pose>,
     pub goal: ArcSwap<Vector6<f64>>,
+    pub stop: AtomicBool,
+    pub avg_current: Arc<Mutex<f64>>,
     pub mission: Box<dyn Mission>,
 }
 
@@ -69,6 +74,8 @@ impl MissionExecutor {
             new_objects: Notify::new(),
             pose: ArcSwap::new(Arc::new(origin)),
             goal: ArcSwap::new(Arc::new(goal)),
+            stop: AtomicBool::new(false),
+            avg_current: Arc::new(Mutex::new(0.0)),
             mission,
         }
     }
@@ -81,7 +88,7 @@ impl MissionExecutor {
         old_goal.y = dest.y;
         old_goal.z = dest.z;
         self.goal.store(Arc::new(old_goal));
-        loop {
+        while !self.stop.load(Ordering::Relaxed) {
             let pose = self.pose.load();
             let goal = self.goal.load();
             let dist = pose.pos.metric_distance(&dest);
@@ -265,7 +272,10 @@ async fn main() {
         let mut sum_err = Vector6::zeros();
         let mut prev_pose_err = Vector6::zeros();
         let mut prev_now = Instant::now();
-        loop {
+        let mut count = 1.0; //Technically can be an integer but since we are multiplying by float...
+        let log_interval = Duration::from_millis(500);
+        let mut last_log = Instant::now();
+        while !td.stop.load(Ordering::Relaxed) {
             let now = Instant::now();
             let dt = now.duration_since(prev_now).as_secs_f64();
 
@@ -317,6 +327,28 @@ async fn main() {
                 .publish(&thrusters_msg)
                 .expect("Failed to publish");
 
+            let mut sum_curr = 0.0;
+            for val in &thurstor_values {
+                sum_curr += val.abs();
+            }
+            let mut avg_curr = td.avg_current.lock().await;
+            *avg_curr = (*avg_curr * (count - 1.0) + sum_curr) / count;
+            count += 1.0;
+            if now.duration_since(last_log) >= log_interval {
+                r2r::log_info!(
+                    "thruster_report",
+                    "Average thruster usage in runtime: {:.2}",
+                    *avg_curr
+                );
+                r2r::log_info!(
+                    "thruster_report",
+                    "Current sum of thrusters: {:.2}",
+                    sum_curr
+                );
+                last_log = now;
+            }
+            drop(avg_curr);
+
             prev_pose_err = pose_err;
             prev_now = now;
 
@@ -325,7 +357,7 @@ async fn main() {
     };
 
     let scout = |td: Arc<MissionExecutor>| async move {
-        loop {
+        while !td.stop.load(Ordering::Relaxed) {
             // TODO: do scouting, this code has to have .await's so that abort works
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
@@ -333,7 +365,7 @@ async fn main() {
     let mut scout_handle = tokio::spawn(scout(Arc::clone(&td)));
 
     let consume_new_objects = |td: Arc<MissionExecutor>| async move {
-        loop {
+        while !td.stop.load(Ordering::Relaxed) {
             td.new_objects.notified().await;
             scout_handle.abort();
             let mut reacted = td.map_objects_reacted.load(Ordering::Relaxed);
@@ -360,7 +392,15 @@ async fn main() {
     tokio::spawn(go_to_goal(Arc::clone(&td)));
 
     r2r::log_info!("", "start spinning!");
-    loop {
+    while !td.stop.load(Ordering::Relaxed) {
         node.spin_once(Duration::from_millis(100));
     }
+
+    let avg_current = td.avg_current.lock().await;
+
+    r2r::log_info!(
+        "thruster_report",
+        "Average thruster usage in runtime: {:.2}",
+        *avg_current
+    );
 }
