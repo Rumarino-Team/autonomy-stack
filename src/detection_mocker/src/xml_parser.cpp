@@ -6,9 +6,16 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <filesystem>
 
 namespace detection_mocker
 {
+    std::string XMLParser::mesh_base_path_;
+
+    void XMLParser::setMeshBasePath(const std::string &mesh_base_path)
+    {
+        mesh_base_path_ = mesh_base_path;
+    }
 
 
     std::vector<StaticObject> XMLParser::parseStaticObjects(const std::string &scn_file_path)
@@ -331,6 +338,7 @@ namespace detection_mocker
 
     Eigen::Vector3d XMLParser::getCustomMeshDimensions(const std::string &mesh_filename)
     {
+
         static std::map<std::string, Eigen::Vector3d> mesh_dims_cache;
 
         auto cached = mesh_dims_cache.find(mesh_filename);
@@ -338,11 +346,19 @@ namespace detection_mocker
         {
             return cached->second;
         }
+        
+        std::filesystem::path mesh_path(mesh_filename);
+        if (!mesh_path.is_absolute())
+        {
+            mesh_path = std::filesystem::path(mesh_base_path_) / mesh_path;
+        }
 
-        std::ifstream mesh_file(mesh_filename);
+        const std::string full_mesh_path = mesh_path.string();
+
+        std::ifstream mesh_file(full_mesh_path);
         if (!mesh_file.is_open())
         {
-            std::cerr << "Warning: Failed to open mesh '" << mesh_filename
+            std::cerr << "Warning: Failed to open mesh '" << full_mesh_path
                       << "', using default bounding box (0.5m cube)" << std::endl;
             Eigen::Vector3d fallback(0.5, 0.5, 0.5);
             mesh_dims_cache.emplace(mesh_filename, fallback);

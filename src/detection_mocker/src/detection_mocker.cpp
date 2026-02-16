@@ -78,6 +78,7 @@ namespace detection_mocker
     // Declare and get parameters with defaults
     this->declare_parameter("scn_file_path", "");
     this->declare_parameter("robot_scn_file_path", "");
+    this->declare_parameter("mesh_base_path", "");
     this->declare_parameter("odometry_topic", "/hydrus/odometry");
     this->declare_parameter("map_output_topic", "/map");
     this->declare_parameter("publish_rate_hz", 10.0);
@@ -87,6 +88,7 @@ namespace detection_mocker
 
     scn_file_path_ = this->get_parameter("scn_file_path").as_string();
     robot_scn_file_path_ = this->get_parameter("robot_scn_file_path").as_string();
+    mesh_base_path_ = this->get_parameter("mesh_base_path").as_string();
     odometry_topic_ = this->get_parameter("odometry_topic").as_string();
     map_output_topic_ = this->get_parameter("map_output_topic").as_string();
     publish_rate_hz_ = this->get_parameter("publish_rate_hz").as_double();
@@ -107,6 +109,8 @@ namespace detection_mocker
   void DetectionMocker::parseSceneFiles()
   {
     RCLCPP_INFO(this->get_logger(), "Parsing scene files...");
+
+    XMLParser::setMeshBasePath(mesh_base_path_);
 
     // Parse static objects from environment scene
     static_objects_ = XMLParser::parseStaticObjects(scn_file_path_);
@@ -376,7 +380,6 @@ namespace detection_mocker
     marker.header.stamp = this->now();
     marker.ns = marker_ns;
     marker.id = marker_id;
-    marker.type = visualization_msgs::msg::Marker::CUBE;
     marker.action = visualization_msgs::msg::Marker::ADD;
 
     marker.pose.position.x = static_obj.position.x();
@@ -393,6 +396,7 @@ namespace detection_mocker
     {
     case ObjectType::BOX:
     case ObjectType::MODEL:
+      marker.type = visualization_msgs::msg::Marker::CUBE;
       marker.scale.x = static_obj.dimensions.x();
       marker.scale.y = static_obj.dimensions.y();
       marker.scale.z = static_obj.dimensions.z();

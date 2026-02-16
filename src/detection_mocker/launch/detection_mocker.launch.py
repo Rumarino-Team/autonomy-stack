@@ -6,6 +6,7 @@ import os
 def generate_launch_description():
     # Get path to scenario files
     controller_pkg_dir = get_package_share_directory('controller_stonefish')
+    controller_data_dir = os.path.join(controller_pkg_dir, 'data')
     env_scn = os.path.join(controller_pkg_dir, 'data', 'scenarios', 'hydrus_env.scn')
     robot_scn = os.path.join(controller_pkg_dir, 'data', 'scenarios', 'hydrus_auv.scn')
 
@@ -19,6 +20,7 @@ def generate_launch_description():
             parameters=[{
                 'scn_file_path': env_scn,
                 'robot_scn_file_path': robot_scn,
+                'mesh_base_path': controller_data_dir,
                 'odometry_topic': '/hydrus/odometry',
                 'map_output_topic': '/map',
                 'publish_rate_hz': 10.0,

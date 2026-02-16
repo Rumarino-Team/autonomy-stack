@@ -16,6 +16,12 @@ namespace detection_mocker
     {
     public:
         /**
+         * @brief Set base path used to resolve relative mesh filenames
+         * @param mesh_base_path Absolute base path (e.g., package data directory)
+         */
+        static void setMeshBasePath(const std::string &mesh_base_path);
+
+        /**
          * @brief Parse static objects from environment scene file
          * @param scn_file_path Path to the .scn file
          * @return Vector of static objects
@@ -40,6 +46,8 @@ namespace detection_mocker
         static MapBounds computeMapBounds(const std::vector<StaticObject> &objects, double padding_factor = 1.1);
 
     private:
+        static std::string mesh_base_path_;
+
         /**
          * @brief Parse a single <static> XML element
          */

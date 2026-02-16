@@ -95,6 +95,7 @@ private:
     // ROS parameters
     std::string scn_file_path_;
     std::string robot_scn_file_path_;
+    std::string mesh_base_path_;
     std::string odometry_topic_;
     std::string map_output_topic_;
     double publish_rate_hz_;
