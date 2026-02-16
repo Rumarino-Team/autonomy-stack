@@ -189,7 +189,6 @@ namespace detection_mocker
         element->QueryStringAttribute("cls", &cls_str);
         if(!cls_str)
         {
-            // Default to PATH if cls attribute is missing
             obj.cls = ClassType::OTHER;
         }
         else

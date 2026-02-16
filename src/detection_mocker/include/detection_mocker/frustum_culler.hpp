@@ -14,6 +14,12 @@ namespace detection_mocker
     {
     public:
         /**
+         * @brief Default constructor
+         * Initializes detection range to [1.0, 50.0] meters
+         */
+        FrustumCuller();
+
+        /**
          * @brief Constructor
          * @param min_distance Minimum detection distance (meters)
          * @param max_distance Maximum detection distance (meters)

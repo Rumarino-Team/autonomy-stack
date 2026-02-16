@@ -72,7 +72,7 @@
 		</visual>
 		<material name="steel" />
 		<look name="gatetex" />
-		<world_transform rpy="0.0 0.0 1.5708" xyz="8.0 1.0 3.0" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="1.0 8.0 3.0" />
 	</static>
 
 
@@ -81,7 +81,7 @@
 	<!-- Marker -->
 	<static name="Marker" type="cylinder" cls="cube">
 		<dimensions radius="0.1" height="4" />
-		<world_transform rpy="0.0 0.0 0.0" xyz="20.0 1.0 2.0" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="1.0 20.0 2.0" />
 		<material name="pvc" />
 		<look name="yellow" />
 	</static>
@@ -91,19 +91,20 @@
 		<origin rpy="0.0 0.0 0.0" xyz="" />
 		<material name="aluminium" />
 		<look name="black" />
-		<world_transform rpy="0.0 0.0 0.0" xyz="0.0 1.0 2.0" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="1.0 2.0 2.0" />
 	</static>
 
-	<volumetric_trigger>
+	<!-- TODO// THIS IS SUPPOSE TO BE FOR TESTING IF THE MISSION ACTED CORRECTLY -->
+	<!-- <volumetric_trigger>
 	<origin rpy="0.0 0.0 0.0" xyz="10.0 1.0 2.0" />
 	<dimensions xyz="2.0 2.0 4.0" />
-	</volumetric_trigger>
+	</volumetric_trigger> -->
 
 
 	<!-- Single Hydrus AUV instance -->
 	<include file="scenarios/hydrus_auv.scn">
 		<arg name="robot_name" value="HydrusAUV" />
-		<arg name="robot_rpy" value="0.0 0.0 0.0" />
-		<arg name="robot_position" value="-3.0 1.0 1.0" />
+		<arg name="robot_rpy" value="0.0 0.0 3.14" />
+		<arg name="robot_position" value="0.0 -1.0 2.0" />
 	</include>
 </scenario>

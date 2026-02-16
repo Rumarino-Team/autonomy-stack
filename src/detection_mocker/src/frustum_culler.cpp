@@ -4,6 +4,11 @@
 namespace detection_mocker
 {
 
+    FrustumCuller::FrustumCuller()
+        : FrustumCuller(1.0, 50.0)
+    {
+    }
+
     FrustumCuller::FrustumCuller(double min_distance, double max_distance)
         : min_distance_(min_distance), max_distance_(max_distance)
     {
