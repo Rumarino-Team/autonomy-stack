@@ -1,3 +1,4 @@
+from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
@@ -23,5 +24,10 @@ def generate_launch_description():
                 'window_res_y': '1080',
                 'rendering_quality': 'high'
             }.items()
-        )
+        ),
+        Node(
+            package='controller_stonefish',
+            executable='thruster_teleop',
+            name='thruster_teleop'
+        ),
     ])

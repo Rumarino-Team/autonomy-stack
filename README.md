@@ -119,6 +119,53 @@ source install/setup.bash
 ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify env_file_name:=hydrus_env.scn
 ```
 
+## Thruster Teleop
+
+### Run simulator + teleop
+```sh
+# Terminal 1: launch simulator
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch controller_stonefish hydrussim.launch.py
+
+# Terminal 2: run teleop controller
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 run controller_stonefish thruster_teleop
+```
+
+### Keyboard controls
+- `w/s`: increase/decrease x goal
+- `r/f`: increase/decrease y goal
+- `q/e`: increase/decrease z goal
+- `a/d`: increase/decrease yaw goal
+- `x`: hold current pose and reset PID history
+- `z`: quit teleop
+
+### PS5 controller support
+`thruster_teleop` subscribes to `/joy` (`sensor_msgs/msg/Joy`).
+
+```sh
+# Terminal 3 (if using a controller)
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 run joy joy_node
+```
+
+Default mapping in teleop:
+- Left stick Y: x goal
+- Left stick X: y goal
+- Right stick X: yaw goal
+- L1 / R1: z up / z down
+- Cross: hold current pose
+- Circle: quit
+
+### Use NVIDIA GPU for simulation
+If you want to force NVIDIA offload for the simulator, run:
+
+```sh
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only ros2 launch controller_stonefish hydrussim.launch.py
+```
 
 
 ## Computer Vision
