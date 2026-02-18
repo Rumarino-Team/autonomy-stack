@@ -25,9 +25,9 @@ def generate_launch_description():
                 'rendering_quality': 'high'
             }.items()
         ),
-        Node(
-            package='controller_stonefish',
-            executable='thruster_teleop',
-            name='thruster_teleop'
-        ),
+        # Node(
+        #     package='controller_stonefish',
+        #     executable='thruster_teleop',
+        #     name='thruster_teleop'
+        # ),
     ])
