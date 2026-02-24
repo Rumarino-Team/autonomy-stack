@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<scenario>
+	<robot name="$(arg robot_name)" fixed="false" self_collisions="false">
+		<base_link name="TorpedoLink" type="compound" physics="submerged">
+			<external_part name="TorpedoModel" type="model" physics="submerged" buoyant="true">
+				<physical>
+					<mesh filename="models/torpedo.obj" scale="0.001" />
+					<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+				</physical>
+				<material name="hdpe" />
+				<look name="black" />
+				<compound_transform rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+			</external_part>
+		</base_link>
+
+		<actuator name="Push" type="push">
+			<specs lower_limit="-1.0" upper_limit="1.0" inverted="false" />
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 1.5718" />
+			<link name="TorpedoLink" />
+			<ros_subscriber topic="/torpedo/push" />
+		</actuator>
+
+		<sensor name="Odometry" type="odometry" rate="30.0">
+			<link name="TorpedoLink" />
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+			<ros_publisher topic="/torpedo/odometry" />
+		</sensor>
+
+		<world_transform rpy="$(arg robot_rpy)" xyz="$(arg robot_position)" />
+	</robot>
+</scenario>

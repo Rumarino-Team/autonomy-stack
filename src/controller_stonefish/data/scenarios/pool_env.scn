@@ -183,4 +183,28 @@
 		<arg name="robot_rpy" value="0.0 0.0 0.0" />
 		<arg name="robot_position" value="1.0 1.0 1.0" />
 	</include>
+
+	<include file="scenarios/torpedo.scn">
+		<arg name="robot_name" value="Torpedo" />
+		<arg name="robot_rpy" value="0.0 0.0 0.0" />
+		<arg name="robot_position" value="1.0 1.2 0.75" />
+	</include>
+
+	<include file="scenarios/sphere.scn">
+		<arg name="robot_name" value="Sphere" />
+		<arg name="robot_rpy" value="0.0 0.0 0.0" />
+		<arg name="robot_position" value="1.0 1.2 1.25" />
+	</include>
+
+	<glue name="TorpedoAttach" activated="true">
+		<first_body name="HydrusAUV/Hydrus" />
+		<second_body name="Torpedo/TorpedoLink" />
+		<ros_service topic="/torpedo/attach" />
+	</glue>
+
+	<glue name="Dropper" activated="true">
+		<first_body name="HydrusAUV/Hydrus" />
+		<second_body name="Sphere/SphereLink" />
+		<ros_service topic="/dropper/drop" />
+	</glue>
 </scenario>
