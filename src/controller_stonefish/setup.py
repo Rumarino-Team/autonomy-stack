@@ -4,6 +4,7 @@ from setuptools import find_packages, setup
 
 package_name = 'controller_stonefish'
 
+
 def files_under(root_dir):
     # Yield (install_dir, [file_path]) pairs for every file under root_dir
     pairs = []
@@ -16,8 +17,10 @@ def files_under(root_dir):
             pairs.append((install_dir, [path]))
     return pairs
 
+
 data_files = [
-    ('share/ament_index/resource_index/packages', [os.path.join('resource', package_name)]),
+    ('share/ament_index/resource_index/packages',
+     [os.path.join('resource', package_name)]),
     ('share/' + package_name, ['package.xml']),
 ]
 
@@ -41,6 +44,8 @@ setup(
     entry_points={
         'console_scripts': [
             'thruster_teleop = controller_stonefish.thruster_teleop:main',
+            'launch_torpedo = controller_stonefish.launch_torpedo:main',
+            'drop_sphere = controller_stonefish.drop_sphere:main',
         ],
     },
 )

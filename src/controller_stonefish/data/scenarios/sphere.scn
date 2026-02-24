@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<scenario>
+	<robot name="$(arg robot_name)" fixed="false" self_collisions="false">
+		<base_link name="SphereLink" type="compound" physics="submerged">
+			<external_part name="sphere" type="sphere" physics="submerged" buoyant="true">
+				<dimensions radius="0.05" />
+				<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+				<material name="aluminium" />
+				<look name="green" />
+				<compound_transform rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+			</external_part>
+		</base_link>
+
+		<sensor name="Odometry" type="odometry" rate="30.0">
+			<link name="SphereLink" />
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+			<ros_publisher topic="/sphere/odometry" />
+		</sensor>
+
+		<world_transform rpy="$(arg robot_rpy)" xyz="$(arg robot_position)" />
+	</robot>
+</scenario>
