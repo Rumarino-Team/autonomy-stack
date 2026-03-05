@@ -55,6 +55,7 @@
 		<look name="propeller" gray="1.0" roughness="0.3" />
 		<look name="gatetex" gray="1.0" roughness="0.3" texture="textures/gate.png" />
 		<look name="bintex" gray="1.0" roughness="0.3" texture="textures/bin.png" />
+		<look name="boardtex" gray="1.0" roughness="0.3" texture="textures/board.png" />
 	</looks>
 
 	<static name="Ground" type="plane">
@@ -190,6 +191,20 @@
 		<material name="steel" />
 		<look name="bintex" />
 		<world_transform rpy="3.14159 0.0 0.0" xyz="3.0 10.0 2.09" />
+	</static>
+
+	<static name="Board" type="model">
+		<physical>
+			<mesh filename="models/board.obj" scale="1.0" convex="false" />
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+		</physical>
+		<visual>
+			<mesh filename="models/board.obj" scale="1.0" />
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+		</visual>
+		<material name="steel" />
+		<look name="boardtex" />
+		<world_transform rpy="0.0 0.0 0.0" xyz="1.5 12.0 1.0" />
 	</static>
 
 	<!-- Single Hydrus AUV instance -->
