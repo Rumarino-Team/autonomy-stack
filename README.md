@@ -106,13 +106,13 @@ cd ../../../../../
 ### With GUI (local development)
 ```sh
 # Navigate to the workspace
-cd ~/ros2_ws/rumarino-ros2-jazzy
+cd ~/autonomy-stack
 
 # Source ROS 2 environment
 source /opt/ros/jazzy/setup.bash
 
 # Build packages
-colcon build --packages-select interfaces bringup Stonefish stonefish_ros2 controller_stonefish  detection_mocker mission_executor
+colcon build --packages-select interfaces bringup Stonefish stonefish_ros2 controller_stonefish detection_mocker mission_executor sim_test_harness
 
 # Source the workspace
 source install/setup.bash
@@ -125,15 +125,10 @@ ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify env
 
 ### Run simulator + teleop
 ```sh
-# Terminal 1: launch simulator
+# Single terminal: launch simulator + teleop (keyboard control)
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-ros2 launch controller_stonefish hydrussim.launch.py
-
-# Terminal 2: run teleop controller
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-ros2 run controller_stonefish thruster_teleop
+ros2 launch bringup thruster_teleop_stack.launch.py
 ```
 
 ### Keyboard controls
@@ -148,10 +143,10 @@ ros2 run controller_stonefish thruster_teleop
 `thruster_teleop` subscribes to `/joy` (`sensor_msgs/msg/Joy`).
 
 ```sh
-# Terminal 3 (if using a controller)
+# Launch with joystick support (starts joy_node automatically)
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-ros2 run joy joy_node
+ros2 launch bringup thruster_teleop_stack.launch.py use_joy:=true
 ```
 
 Default mapping in teleop:
@@ -166,7 +161,15 @@ Default mapping in teleop:
 If you want to force NVIDIA offload for the simulator, run:
 
 ```sh
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only ros2 launch controller_stonefish hydrussim.launch.py
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch bringup thruster_teleop_stack.launch.py use_nvidia_offload:=true
+```
+
+You can combine options, for example:
+
+```sh
+ros2 launch bringup thruster_teleop_stack.launch.py use_joy:=true use_nvidia_offload:=true
 ```
 
 

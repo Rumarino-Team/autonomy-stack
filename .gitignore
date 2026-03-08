@@ -26,5 +26,5 @@ setup_clangd.sh
 src/bringup/launch/depth_with_simulator.launch.py
 __pycache__/
 *.pyc
-
+src/practice_ros2
 

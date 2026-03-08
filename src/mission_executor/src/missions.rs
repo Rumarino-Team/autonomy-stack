@@ -12,6 +12,8 @@ pub(crate) struct PrecualifyMission {}
 
 const FAR_ENOUGH: f64 = 2.0;
 const OVERSHOOT: f64 = 2.0;
+// Offset below the gate crossbar so the AUV passes through the gate opening, not into the crossbar
+const GATE_PASS_Z_OFFSET: f64 = 0.5;
 
 impl PrecualifyMission {
     pub(crate) fn new() -> Self {
@@ -75,14 +77,17 @@ impl PrecualifyMission {
         let direction_2d = (object_pos_2d - sub_pos_2d).normalize();
 
         let before_2d = object_pos_2d - direction_2d * FAR_ENOUGH;
-        let before = Vector3::new(before_2d.x, before_2d.y, object_pos.z);
+        // Navigate GATE_PASS_Z_OFFSET below the crossbar so the AUV passes through the gate
+        // opening rather than colliding with the horizontal crossbar at object_pos.z
+        let gate_z = object_pos.z + GATE_PASS_Z_OFFSET;
+        let before = Vector3::new(before_2d.x, before_2d.y, gate_z);
 
         r2r::log_info!("before object_pos", "{object_pos_2d:?}");
         r2r::log_info!("before sub_pos", "{sub_pos_2d:?}");
         r2r::log_info!("before", "{before:?}");
 
         let overshoot_2d = object_pos_2d + direction_2d * OVERSHOOT;
-        let overshoot = Vector3::new(overshoot_2d.x, overshoot_2d.y, object_pos.z);
+        let overshoot = Vector3::new(overshoot_2d.x, overshoot_2d.y, gate_z);
 
         let point_list: Vec<Point3<f64>> = vec![before.into(), overshoot.into()];
 

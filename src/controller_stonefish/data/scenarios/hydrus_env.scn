@@ -61,7 +61,7 @@
 
 	<!-- Gate -->
 
-	<static name="Gate" type="model" clss="gate">
+	<static name="Gate" type="model" cls="gate">
 		<physical>
 			<mesh filename="models/gate.obj" scale="1.0" convex="false" />
 			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
@@ -94,11 +94,17 @@
 		<world_transform rpy="0.0 0.0 0.0" xyz="1.0 2.0 2.0" />
 	</static>
 
-	<!-- TODO// THIS IS SUPPOSE TO BE FOR TESTING IF THE MISSION ACTED CORRECTLY -->
-	<!-- <volumetric_trigger>
-	<origin rpy="0.0 0.0 0.0" xyz="10.0 1.0 2.0" />
-	<dimensions xyz="2.0 2.0 4.0" />
-	</volumetric_trigger> -->
+	<!-- Volumetric triggers for automated testing -->
+	<!-- AUV must reach each volume within timeout_s (wall-clock seconds) or the test fails -->
+	<volumetric_trigger name="through_gate" timeout_s="20.0">
+		<origin rpy="0.0 0.0 0.0" xyz="1.0 8.0 3.0" />
+		<dimensions xyz="3.0 3.0 3.0" />
+	</volumetric_trigger>
+
+	<volumetric_trigger name="near_marker" timeout_s="30.0">
+		<origin rpy="0.0 0.0 0.0" xyz="1.0 20.0 2.0" />
+		<dimensions xyz="4.0 4.0 4.0" />
+	</volumetric_trigger>
 
 
 	<!-- Single Hydrus AUV instance -->
