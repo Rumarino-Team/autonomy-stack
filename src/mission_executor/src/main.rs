@@ -51,13 +51,12 @@ struct MissionExecutor {
     pub goal: ArcSwap<Vector6<f64>>,
     pub stop: AtomicBool,
     pub avg_current: Arc<Mutex<f64>>,
-    pub mission: Box<dyn Mission>,
 }
 
 const CLOSE_ENOUGH: f64 = 1.0;
 
 impl MissionExecutor {
-    pub fn new(mission: Box<dyn Mission>) -> Self {
+    pub fn new() -> Self {
         // hardcoded so it doesn't freak out while it waits for first odometry
         let origin = Pose {
             pos: Vector3::new(-3.0, 1.0, 1.0),
@@ -76,7 +75,7 @@ impl MissionExecutor {
             goal: ArcSwap::new(Arc::new(goal)),
             stop: AtomicBool::new(false),
             avg_current: Arc::new(Mutex::new(0.0)),
-            mission,
+            // mission,
         }
     }
 
@@ -151,13 +150,14 @@ impl MissionExecutor {
 }
 
 #[repr(i32)]
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum ObjectCls {
     Cube = 0,
     Rectangle = 1,
     Gate = 2,
     Shark = 3,
     Other = 4,
+    SwordFish = 5,
 }
 
 pub struct BoundingBox3D {
@@ -193,7 +193,7 @@ impl From<&r2r::interfaces::msg::MapObject> for MapObject {
 }
 
 trait Mission: Send + Sync {
-    fn react_to_object(&self, td: &MissionExecutor, idx: usize);
+    fn react_to_object(&mut self, td: &MissionExecutor, idx: usize);
 }
 
 type MapMsg = r2r::interfaces::msg::Map;
@@ -214,6 +214,7 @@ async fn main() {
         Some(r2r::Parameter { value, .. }) => match value {
             ParameterValue::String(str) => match str.as_str() {
                 "prequalify" => Box::new(missions::PrecualifyMission::new()),
+                "drop_into_box" => Box::new(missions::DropIntoBoxMission::new()),
                 _ => panic!("mission_name param must be a mission that exists"),
             },
             _ => panic!("mission_name param must be passed a string"),
@@ -222,7 +223,7 @@ async fn main() {
     };
     drop(params);
 
-    let td = Arc::new(MissionExecutor::new(mission));
+    let td = Arc::new(MissionExecutor::new());
 
     let map_qos = QosProfile::default().keep_last(1).transient_local();
     let mut map_sub = node
@@ -365,6 +366,7 @@ async fn main() {
     let mut scout_handle = tokio::spawn(scout(Arc::clone(&td)));
 
     let consume_new_objects = |td: Arc<MissionExecutor>| async move {
+        let mut mission = mission;
         while !td.stop.load(Ordering::Relaxed) {
             td.new_objects.notified().await;
             scout_handle.abort();
@@ -376,7 +378,7 @@ async fn main() {
                 }
                 while reacted < objects_len {
                     r2r::log_info!("reacting...", "{reacted}");
-                    td.mission.react_to_object(&td, reacted);
+                    mission.react_to_object(&td, reacted);
                     r2r::log_info!("reacted", "{reacted}");
                     reacted += 1;
                 }

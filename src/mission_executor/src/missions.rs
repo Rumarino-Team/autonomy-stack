@@ -5,6 +5,7 @@ use nalgebra::{
 use crate::{
     MapObject, Mission, MissionExecutor, ObjectCls,
 };
+use std::sync::atomic::Ordering;
 
 // this could hold some state if necessary
 // like the some sort of queue if a sequence of reactions is necessary
@@ -91,13 +92,122 @@ impl PrecualifyMission {
 }
 
 impl Mission for PrecualifyMission {
-    fn react_to_object(&self, td: &MissionExecutor, idx: usize) {
+    fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
         let object = MapObject::from(&td.map.load().objects[idx]);
         match object.cls {
             ObjectCls::Rectangle | ObjectCls::Cube => self.go_around(td, idx),
             ObjectCls::Gate => self.go_through(td, idx),
             ObjectCls::Shark => (),
             ObjectCls::Other => (),
+            ObjectCls::SwordFish => (),
         }
+    }
+}
+
+macro_rules! add_flags {
+    ($thing:expr, $($flag:expr),+ $(,)?) => {{
+        let mask = 0i32 $(| (1 << ($flag as i32)))+;
+        $thing |= mask;
+    }};
+}
+
+macro_rules! has_flags {
+    ($thing:expr, $($flag:expr),+ $(,)?) => {{
+        let mask = 0i32 $(| (1 << ($flag as i32)))+;
+        ($thing as i32 & mask) == mask
+    }};
+}
+
+enum DropIntoBoxMissionStep {
+    FindGateSharkAndSwordFish,
+    GoAboveBox,
+    DropTheThing,
+}
+
+pub(crate) struct DropIntoBoxMission {
+    step: DropIntoBoxMissionStep,
+    seen: i32, // asuming only 32 classes
+    gate_idx: usize,
+    shark_idx: usize,
+    sword_fish_idx: usize,
+    box_idx: usize,
+}
+
+impl Mission for DropIntoBoxMission {
+    fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
+        let object = MapObject::from(&td.map.load().objects[idx]);
+        add_flags!(self.seen, object.cls);
+        match self.step {
+            DropIntoBoxMissionStep::FindGateSharkAndSwordFish => {
+                match object.cls {
+                    ObjectCls::Gate => self.gate_idx = idx,
+                    ObjectCls::Shark => self.shark_idx = idx,
+                    ObjectCls::SwordFish => self.sword_fish_idx = idx,
+                    _ => (),
+                }
+                if has_flags!(self.seen, ObjectCls::Gate, ObjectCls::Shark, ObjectCls::SwordFish) {
+                    self.move_to_gate_prefered_side(&td);
+                    self.step = DropIntoBoxMissionStep::GoAboveBox;
+                }
+            },
+            DropIntoBoxMissionStep::GoAboveBox => {
+                match object.cls {
+                    ObjectCls::Cube => self.box_idx = idx,
+                    _ => (),
+                }
+                if has_flags!(self.seen, ObjectCls::Cube) {
+                    self.move_above_cube(&td);
+                    self.seen = 0; // forget about previous
+                    self.step = DropIntoBoxMissionStep::DropTheThing;
+                }
+            },
+            DropIntoBoxMissionStep::DropTheThing => {
+                match object.cls {
+                    ObjectCls::Shark => self.shark_idx = idx,
+                    ObjectCls::SwordFish => self.sword_fish_idx = idx,
+                    _ => (),
+                }
+                if has_flags!(self.seen, ObjectCls::Shark, ObjectCls::SwordFish) {
+                    self.move_to_gate_prefered_side(&td);
+                    td.stop.store(true, Ordering::Relaxed);
+                }
+            }
+        }
+    }
+}
+
+impl DropIntoBoxMission {
+    pub(crate) fn new() -> Self {
+        Self {
+            step: DropIntoBoxMissionStep::FindGateSharkAndSwordFish,
+            seen: 0,
+            gate_idx: 0,
+            shark_idx: 0,
+            sword_fish_idx: 0,
+            box_idx: 0,
+        }
+    }
+
+    const PREFERED_GATE_OPTION: ObjectCls = ObjectCls::SwordFish;
+    fn move_to_gate_prefered_side(&mut self, td: &MissionExecutor) {
+        let objects = &td.map.load().objects;
+        let shark_object = MapObject::from(&objects[self.shark_idx]);
+        let sword_fish_object = MapObject::from(&objects[self.sword_fish_idx]);
+        let gate_object = MapObject::from(&objects[self.gate_idx]);
+        todo!("actually cross gate in prefered side")
+    }
+
+    fn move_above_cube(&mut self, td: &MissionExecutor) {
+        let objects = &td.map.load().objects;
+        let box_object = MapObject::from(&objects[self.box_idx]);
+        todo!("actually move above cube")
+    }
+
+    fn move_above_prefered_and_drop_thing(&mut self, td: &MissionExecutor) {
+        let objects = &td.map.load().objects;
+        let box_object = MapObject::from(&objects[self.box_idx]);
+        let shark_object = MapObject::from(&objects[self.shark_idx]);
+        let sword_fish_object = MapObject::from(&objects[self.sword_fish_idx]);
+        todo!("actually drop thing in prefered side")
     }
 }
