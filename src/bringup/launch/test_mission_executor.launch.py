@@ -7,6 +7,7 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 def generate_launch_description():
     mission_name = LaunchConfiguration('mission_name')
+    controller_name = LaunchConfiguration('controller_name')
     env_file_name = LaunchConfiguration('env_file_name')
 
     return LaunchDescription([
@@ -43,6 +44,7 @@ def generate_launch_description():
             executable='mission_executor',
             parameters=[{
                 'mission_name': mission_name,
+                'controller_name': controller_name,
             }],
         ),
     ])

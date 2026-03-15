@@ -22,6 +22,7 @@ docker run --rm \
     source /ros2_ws/install/setup.bash && \
     ros2 launch bringup test_mission_executor_headless.launch.py \
       mission_name:=prequalify \
+      controller_name:=stonefish_hydrus \
       env_file_name:=hydrus_env_headless.scn &
     LAUNCH_PID=\$! && \
     sleep 15 && \
@@ -118,7 +119,7 @@ colcon build --packages-select interfaces bringup Stonefish stonefish_ros2 contr
 source install/setup.bash
 
 # Run with GUI
-ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify env_file_name:=hydrus_env.scn
+ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify controller_name:=stonefish_hydrus env_file_name:=hydrus_env.scn
 ```
 
 ## Thruster Teleop

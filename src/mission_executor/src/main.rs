@@ -14,8 +14,7 @@ use std::time::{Duration, Instant};
 use arc_swap::ArcSwap;
 use futures::StreamExt;
 use nalgebra::{
-    ArrayStorage, Isometry3, Matrix4x3, Point3, Quaternion, SimdPartialOrd, U8, UnitQuaternion,
-    Vector, Vector3, Vector6,
+    ArrayStorage, DVector, Isometry3, Matrix1x3, Matrix1x6, Matrix4x3, MatrixXx3, MatrixXx6, Point3, Quaternion, SimdPartialOrd, UnitQuaternion, Vector, Vector3, Vector6, U8
 };
 type Vector8<T> = Vector<T, U8, ArrayStorage<T, 8, 1>>;
 use parry3d_f64::shape::Segment;
@@ -24,6 +23,7 @@ use tokio::sync::Notify;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::timeout;
 use futures::lock::Mutex;
+use notify::Watcher;
 
 #[derive(Clone, Copy, Debug)]
 struct Pose {
@@ -196,6 +196,87 @@ trait Mission: Send + Sync {
     fn react_to_object(&mut self, td: &MissionExecutor, idx: usize);
 }
 
+#[derive(Debug, Clone)]
+struct ControllerConfig {
+    kp: Vector6<f64>,
+    ki: Vector6<f64>,
+    kd: Vector6<f64>,
+}
+
+#[derive(Debug, Clone)]
+struct LiveConfig {
+    controllers: std::collections::HashMap<String, ControllerConfig>,
+}
+
+fn read_vec6(table: &toml_edit::Table, key: &str) -> Vector6<f64> {
+    if let Some(arr) = table.get(key).and_then(|v| v.as_array()) {
+        let mut v = Vector6::zeros();
+        for (i, val) in arr.iter().enumerate().take(6) {
+            v[i] = val.as_float().unwrap_or(0.0);
+        }
+        v
+    } else {
+        Vector6::zeros()
+    }
+}
+
+fn load_config(path: &str) -> LiveConfig {
+    let content = std::fs::read_to_string(path).unwrap_or_default();
+    let doc = content
+        .parse::<toml_edit::DocumentMut>()
+        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
+
+
+    let mut controllers_map = std::collections::HashMap::new();
+
+    if let Some(controllers) = doc.get("controllers").and_then(|t| t.as_table()) {
+        for (name, table) in controllers.iter() {
+            if let Some(table) = table.as_table() {
+
+                controllers_map.insert(name.to_string(), ControllerConfig {
+                    kp: read_vec6(table, "kp"),
+                    ki: read_vec6(table, "ki"),
+                    kd: read_vec6(table, "kd"),
+                });
+            }
+        }
+    }
+
+    LiveConfig { controllers: controllers_map }
+}
+
+fn save_config(path: &str, cfg: &LiveConfig) {
+    let mut doc = toml_edit::DocumentMut::new();
+    let mut controllers = toml_edit::Table::new();
+
+    for (name, thing) in &cfg.controllers {
+        let mut table = toml_edit::Table::new();
+
+        let mut arr = toml_edit::Array::new();
+        for v in thing.kp.as_slice() {
+            arr.push(*v as f64);
+        }
+        table["kp"] = toml_edit::Item::Value(arr.into());
+
+        let mut arr = toml_edit::Array::new();
+        for v in thing.ki.as_slice() {
+            arr.push(*v as f64);
+        }
+        table["ki"] = toml_edit::Item::Value(arr.into());
+
+        let mut arr = toml_edit::Array::new();
+        for v in thing.kd.as_slice() {
+            arr.push(*v as f64);
+        }
+        table["kd"] = toml_edit::Item::Value(arr.into());
+
+        controllers[name] = toml_edit::Item::Table(table);
+    }
+
+    doc["controllers"] = toml_edit::Item::Table(controllers);
+    std::fs::write(path, doc.to_string()).unwrap();
+}
+
 type MapMsg = r2r::interfaces::msg::Map;
 type MapObjectMsg = r2r::interfaces::msg::MapObject;
 type PointMsg = r2r::geometry_msgs::msg::Point;
@@ -221,6 +302,36 @@ async fn main() {
         },
         None => panic!("mission_name param must be passed to mission_executor"),
     };
+
+    let controller_name = match params.get("controller_name") {
+        Some(r2r::Parameter { value, .. }) => match value {
+            // get the tam and stored values for PID runtime "constants"
+            ParameterValue::String(str) => match str.as_str() {
+                "stonefish_hydrus" => str,
+                "stonefish_proteus" => str,
+                "real_proteus" => str,
+                _ => panic!("controller_name param must be a controller that exists"),
+            },
+            _ => panic!("controller_name param must be passed a string"),
+        },
+        None => panic!("controller_name param must be passed to mission_executor"),
+    }.to_owned();
+
+    let tam_x_y_z_roll_pitch_yaw: MatrixXx6<f64> = match controller_name.as_str() {
+        "stonefish_hydrus" =>
+            MatrixXx6::from_rows(&[
+                Matrix1x6::new(-1.0,  1.0,  0.0,  0.0,  0.0,  1.0),
+                Matrix1x6::new(-1.0, -1.0,  0.0,  0.0,  0.0, -1.0),
+                Matrix1x6::new( 1.0,  1.0,  0.0,  0.0,  0.0, -1.0),
+                Matrix1x6::new( 1.0, -1.0,  0.0,  0.0,  0.0,  1.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
+            ]),
+        _ => unimplemented!("no tam for {controller_name}"),
+    };
+
     drop(params);
 
     let td = Arc::new(MissionExecutor::new());
@@ -249,23 +360,62 @@ async fn main() {
         }
     };
 
-    const KP: Vector6<f64> = Vector6::new(3.50, 3.50, 2.20, 2.40, 2.40, 2.20);
-    const KI: Vector6<f64> = Vector6::new(0.10, 0.10, 0.05, 0.05, 0.05, 0.01);
-    const KD: Vector6<f64> = Vector6::new(0.70, 0.90, 0.40, 0.20, 0.20, 0.80);
+    let path = "./src/mission_executor/live_config.toml";
+    let path_buf = std::fs::canonicalize(path).unwrap();
+    r2r::log_info!("config path", "{:?}", path_buf);
 
-    const TAM_X_Y_YAW: Matrix4x3<f64> = Matrix4x3::new(
-        -1.0,  1.0,  1.0,
-        -1.0, -1.0, -1.0,
-         1.0,  1.0, -1.0,
-         1.0, -1.0,  1.0,
-    );
+    // Shared atomic ArcSwap
+    let cfg = Arc::new(ArcSwap::from_pointee(load_config(path)));
 
-    const TAM_Z_ROLL_PITCH: Matrix4x3<f64> = Matrix4x3::new(
-        -1.0,  1.0,  1.0,
-        -1.0, -1.0,  1.0,
-        -1.0,  1.0, -1.0,
-        -1.0, -1.0, -1.0,
-    );
+    // Notify channel
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(8);
+
+    let watch_path = path_buf.clone();
+    std::thread::spawn(move || {
+        let (notify_tx, notify_rx) = std::sync::mpsc::channel();
+
+        let mut watcher = notify::RecommendedWatcher::new(
+            notify_tx,
+            notify::Config::default(),
+        )
+        .expect("failed to create watcher");
+
+        // watch the parent directory instead of the file
+        let parent = watch_path.parent().unwrap();
+
+        watcher
+            .watch(parent, notify::RecursiveMode::NonRecursive)
+            .expect("watch failed");
+
+        println!("watching directory: {:?}", parent);
+
+        
+        for event in notify_rx {
+            if let Ok(ev) = event {
+                match ev.kind {
+                    notify::EventKind::Modify(_) | notify::EventKind::Create(_) => {
+                        if ev.paths.iter().any(|p| p.ends_with(&watch_path)) {
+                            let _ = tx.blocking_send(());
+                        }
+                    }
+                    _ => {} // ignore other events
+                }
+            }
+        }
+    });
+
+    let cfg_clone = cfg.clone();
+    let path_reload = path_buf.clone();
+    tokio::spawn(async move {
+        while let Some(_) = rx.recv().await {
+            let new_cfg = load_config(path_reload.to_str().unwrap());
+            r2r::log_info!("", "config change detected {:?}", new_cfg);
+
+            println!("NEW CONFIG: {:?}", new_cfg);
+
+            cfg_clone.store(Arc::new(new_cfg));
+        }
+    });
 
     const THRUSTOR_SATURATE: f64 = 5.0;
 
@@ -277,6 +427,9 @@ async fn main() {
         let log_interval = Duration::from_millis(500);
         let mut last_log = Instant::now();
         while !td.stop.load(Ordering::Relaxed) {
+            let current_cfg = cfg.load();
+            let ControllerConfig { kp, ki, kd } = current_cfg.controllers[&controller_name];
+
             let now = Instant::now();
             let dt = now.duration_since(prev_now).as_secs_f64();
 
@@ -294,32 +447,27 @@ async fn main() {
             let vel_err = (pose_err - prev_pose_err) / dt;
             sum_err += pose_err * dt;
 
-            let wrench = KP.component_mul(&pose_err)
-                + KI.component_mul(&sum_err)
-                + KD.component_mul(&vel_err);
+            let wrench = kp.component_mul(&pose_err)
+                + ki.component_mul(&sum_err)
+                + kd.component_mul(&vel_err);
 
             let rotated = unit.conjugate() * wrench.xyz();
             let xy_error = wrench.xy().norm();
             // only apply yaw when close
             let yaw_scale = if xy_error < 0.5 { 1.0 } else { 0.0 };
-            let input_x_y_yaw = Vector3::new(rotated.x, rotated.y, wrench[5] * yaw_scale);
-            let input_z_roll_pitch = Vector3::new(wrench.z, -wrench[3], wrench[4]);
+
+            let input_x_y_z_roll_pitch_yaw
+                = Vector6::new(rotated.x, rotated.y, wrench.z, -wrench[3], wrench[4], wrench[5] * yaw_scale);
 
             // r2r::log_info!("wrench", "{wrench:?}");
             // r2r::log_info!("rotated", "{rotated:?}");
 
-            let mut thurstor_values = Vector8::zeros();
-            thurstor_values
-                .fixed_rows_mut::<4>(0)
-                .copy_from(&(TAM_X_Y_YAW * input_x_y_yaw));
-            thurstor_values
-                .fixed_rows_mut::<4>(4)
-                .copy_from(&(TAM_Z_ROLL_PITCH * input_z_roll_pitch));
+            let mut thurstor_values: DVector<f64> = &tam_x_y_z_roll_pitch_yaw * input_x_y_z_roll_pitch_yaw;
 
             // r2r::log_info!("thurstor_values", "{thurstor_values:?}");
 
-            let minn = Vector8::repeat(-THRUSTOR_SATURATE);
-            let maxx = Vector8::repeat(THRUSTOR_SATURATE);
+            let minn = DVector::repeat(thurstor_values.len(), -THRUSTOR_SATURATE);
+            let maxx = DVector::repeat(thurstor_values.len(), THRUSTOR_SATURATE);
             thurstor_values = thurstor_values.simd_clamp(minn, maxx) / THRUSTOR_SATURATE;
 
             let mut thrusters_msg = Float64MultiArray::default();
