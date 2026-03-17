@@ -329,6 +329,15 @@ async fn main() {
                 Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
             ]),
+        "stonefish_proteus" =>
+            MatrixXx6::from_rows(&[
+                Matrix1x6::new(-1.0,  0.0,  0.0,  0.0,  0.0,  1.0),
+                Matrix1x6::new(-1.0,  0.0,  0.0,  0.0,  0.0, -1.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
+            ]),
         _ => unimplemented!("no tam for {controller_name}"),
     };
 
@@ -376,9 +385,9 @@ async fn main() {
 
         let mut watcher = notify::RecommendedWatcher::new(
             notify_tx,
-            notify::Config::default(),
-        )
-        .expect("failed to create watcher");
+            notify::Config::default()
+                .with_poll_interval(Duration::from_secs(1)),
+        ).expect("failed to create watcher");
 
         // watch the parent directory instead of the file
         let parent = watch_path.parent().unwrap();
