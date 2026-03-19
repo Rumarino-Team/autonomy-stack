@@ -27,11 +27,6 @@ def generate_launch_description():
         default_value="115200",
         description="Serial baud rate",
     )
-    parent_frame_arg = DeclareLaunchArgument(
-        "parent_frame",
-        default_value="base_link",
-        description="Parent frame for IMU transform",
-    )
 
     params_file = LaunchConfiguration("params_file")
     port = LaunchConfiguration("port")
