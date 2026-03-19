@@ -169,15 +169,38 @@ If you want to force NVIDIA offload for the simulator, run:
 ```sh
 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only ros2 launch controller_stonefish hydrussim.launch.py
 ```
+## IMU VN100 test launch
+```bash
+source install/setup.bash
+ros2 launch bringup vn100.launch.py port:=/dev/ttyUSB0 baud:=115200 
+```
 
 
 ## Computer Vision
+
+### ZED Custom Wrapper
 
 ### Dependencies
   - [ZED-SDK 5.1](https://www.stereolabs.com/developers/release)
   - [Cuda 12.8](https://developer.nvidia.com/cuda-12-8-0-download-archive)
 
-### Run ZED Custom Wrapper
 ```sh
 colcon build --packages-select zed_msg zed_custom_wrapper && source ./install/setup.bash && ros2 launch zed_custom_wrapper zed_custom.launch.py onnx_model_path:=./src/zed_custom_wrapper/yolov8n.onnx
 ```
+
+:
+
+
+### Building Orb Slam
+```bash
+cd vendor
+wget https://github.com/UZ-SLAMLab/ORB_SLAM3/raw/refs/heads/master/Vocabulary/ORBvoc.txt.tar.gz
+tar -xf ORBvoc.txt.tar.gz
+git clone https://github.com/Cruiz102/ORB_SLAM3.git
+#build everything with a single command
+cd ORB_SLAM3
+chmod +x build.sh
+sudo ./build.sh
+```
+
+
