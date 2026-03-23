@@ -100,7 +100,7 @@ def thrusters_from_wrench(wrench, quaternion_wxyz, saturate):
 
 
 def compute_thruster_command(
-    current_pose,
+    current_position,
     goal_pose,
     sum_err,
     prev_pose_err,
@@ -111,7 +111,8 @@ def compute_thruster_command(
     kd,
     saturate,
 ):
-    current_pose_vec = np.asarray(current_pose, dtype=float)
+    roll, pitch, yaw = quaternion_to_euler(*quaternion_wxyz)
+    current_pose_vec = np.asarray([*current_position, roll, pitch, yaw], dtype=float)
     goal_pose_vec = np.asarray(goal_pose, dtype=float)
     sum_err_vec = np.asarray(sum_err, dtype=float)
     prev_pose_err_vec = np.asarray(prev_pose_err, dtype=float)

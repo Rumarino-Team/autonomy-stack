@@ -1,13 +1,14 @@
-import threading
+import math
 import sys
 import termios
+import threading
 import time
 import tty
 
 import rclpy
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from sensor_msgs.msg import Joy
+from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float64MultiArray
 
 from controller_stonefish.control_math import (
@@ -35,6 +36,9 @@ class ThrusterTeleOp(Node):
         self.declare_parameter('ki', KI_DEFAULT)
         self.declare_parameter('kd', KD_DEFAULT)
         self.declare_parameter('thruster_saturate', THRUSTOR_SATURATE_DEFAULT)
+        self.declare_parameter('odometry_topic', '/hydrus/odometry')
+        self.declare_parameter('imu_topic', '/hydrus/imu')
+        self.declare_parameter('odometry_stale_timeout', 0.5)
         self.declare_parameter('enable_joy', True)
         self.declare_parameter('joy_deadzone', 0.15)
         self.declare_parameter('joy_axis_scale', 1.0)
@@ -55,6 +59,11 @@ class ThrusterTeleOp(Node):
         self.ki = [float(v) for v in self.get_parameter('ki').value]
         self.kd = [float(v) for v in self.get_parameter('kd').value]
         self.thruster_saturate = float(self.get_parameter('thruster_saturate').value)
+        self.odometry_topic = str(self.get_parameter('odometry_topic').value)
+        self.imu_topic = str(self.get_parameter('imu_topic').value)
+        self.odometry_stale_timeout = float(
+            self.get_parameter('odometry_stale_timeout').value
+        )
         self.enable_joy = bool(self.get_parameter('enable_joy').value)
         self.joy_deadzone = float(self.get_parameter('joy_deadzone').value)
         self.joy_axis_scale = float(self.get_parameter('joy_axis_scale').value)
@@ -73,8 +82,9 @@ class ThrusterTeleOp(Node):
             Float64MultiArray, '/hydrus/thrusters', 10
         )
         self.create_subscription(
-            Odometry, '/hydrus/odometry', self.odometry_callback, 10
+            Odometry, self.odometry_topic, self.odometry_callback, 10
         )
+        self.create_subscription(Imu, self.imu_topic, self.imu_callback, 10)
         if self.enable_joy:
             self.create_subscription(Joy, '/joy', self.joy_callback, 10)
 
@@ -84,14 +94,16 @@ class ThrusterTeleOp(Node):
         self.running = True
 
         self.thruster_speeds = [0.0] * 8
-        self.current_pose = None
+        self.current_position = None
         self.current_quaternion = None
+        self.last_odom_time = None
         self.goal_pose = None
 
         self.sum_err = [0.0] * 6
         self.prev_pose_err = [0.0] * 6
         self.prev_time = None
         self.last_no_odom_warn = 0.0
+        self.last_no_imu_warn = 0.0
         self.joy_axes = []
         self.joy_buttons = []
         self.prev_joy_buttons = []
@@ -100,6 +112,8 @@ class ThrusterTeleOp(Node):
         self.keyboard_thread.daemon = True
         self.keyboard_thread.start()
 
+        self.get_logger().info(f'Using odometry topic: {self.odometry_topic}')
+        self.get_logger().info(f'Using IMU topic: {self.imu_topic}')
         self.print_instructions()
 
     def print_instructions(self):
@@ -115,6 +129,9 @@ class ThrusterTeleOp(Node):
         print(f'  d : Decrease yaw goal by {self.step_yaw:.2f} rad')
         print('  x : Hold current pose and clear PID history')
         print('  z : Quit')
+        print('Control source policy:')
+        print('  Rotation (roll/pitch/yaw + body transform): IMU')
+        print('  Position (x/y/z): odometry, zero-masked when missing/stale')
         if self.enable_joy:
             print('Controller (/joy) mapping (PS5 defaults):')
             print('  Left stick Y : x goal')
@@ -141,22 +158,30 @@ class ThrusterTeleOp(Node):
 
     def odometry_callback(self, msg):
         p = msg.pose.pose.position
-        o = msg.pose.pose.orientation
-        roll, pitch, yaw = quaternion_to_euler(o.w, o.x, o.y, o.z)
+        with self.state_lock:
+            self.current_position = [p.x, p.y, p.z]
+            self.last_odom_time = time.monotonic()
 
-        now = time.monotonic()
-        current_pose = [p.x, p.y, p.z, roll, pitch, yaw]
-        current_quaternion = (o.w, o.x, o.y, o.z)
+    def imu_callback(self, msg):
+        o = msg.orientation
+        quat_norm = math.sqrt(o.w * o.w + o.x * o.x + o.y * o.y + o.z * o.z)
+        if quat_norm < 1e-9:
+            now = time.monotonic()
+            with self.state_lock:
+                if now - self.last_no_imu_warn >= 1.0:
+                    self.get_logger().warning('Received invalid IMU quaternion with near-zero norm.')
+                    self.last_no_imu_warn = now
+            return
+
+        quaternion_wxyz = (
+            o.w / quat_norm,
+            o.x / quat_norm,
+            o.y / quat_norm,
+            o.z / quat_norm,
+        )
 
         with self.state_lock:
-            self.current_pose = current_pose
-            self.current_quaternion = current_quaternion
-            if self.goal_pose is None:
-                self.goal_pose = list(current_pose)
-                self.sum_err = [0.0] * 6
-                self.prev_pose_err = [0.0] * 6
-                self.prev_time = now
-                self.get_logger().info('Odometry initialized. Goal seeded to current pose.')
+            self.current_quaternion = quaternion_wxyz
 
     def joy_callback(self, msg):
         with self.state_lock:
@@ -175,8 +200,8 @@ class ThrusterTeleOp(Node):
             return
 
         with self.state_lock:
-            if self.goal_pose is None or self.current_pose is None:
-                self.get_logger().warning('Ignoring key input until first odometry is received.')
+            if self.goal_pose is None:
+                self.get_logger().warning('Ignoring key input until first IMU sample is received.')
                 return
 
             if key_lower == 'w':
@@ -203,8 +228,14 @@ class ThrusterTeleOp(Node):
             elif key_lower == 'd':
                 self.goal_pose[5] = normalize_angle(self.goal_pose[5] - self.step_yaw)
                 self.get_logger().info(f'yaw goal -> {self.goal_pose[5]:.2f} rad')
+
+            # HOLD POSITION
             elif key_lower == 'x':
-                self.goal_pose = list(self.current_pose)
+                pose_snapshot = self._build_pose_snapshot_locked(time.monotonic())
+                if pose_snapshot is None:
+                    self.get_logger().warning('Cannot hold pose yet; waiting for IMU orientation.')
+                    return
+                self.goal_pose = pose_snapshot
                 self.sum_err = [0.0] * 6
                 self.prev_pose_err = [0.0] * 6
                 self.prev_time = time.monotonic()
@@ -230,48 +261,67 @@ class ThrusterTeleOp(Node):
             prev_buttons, button_index
         ) == 0
 
-    def _reset_pid_state_locked(self, now):
+    def _reset_pid_state(self, now):
         self.sum_err = [0.0] * 6
         self.prev_pose_err = [0.0] * 6
         self.prev_time = now
 
-    def _handle_joy_input_locked(self, now):
-        if not self.enable_joy or self.goal_pose is None or self.current_pose is None:
+    def _build_pose_snapshot_locked(self, now):
+        if self.current_quaternion is None:
+            return None
+
+        odom_is_fresh = (
+            self.last_odom_time is not None
+            and (now - self.last_odom_time) <= self.odometry_stale_timeout
+            and self.current_position is not None
+        )
+        position = list(self.current_position) if odom_is_fresh else [0.0, 0.0, 0.0]
+        roll, pitch, yaw = quaternion_to_euler(*self.current_quaternion)
+        return [position[0], position[1], position[2], roll, pitch, yaw]
+
+    def _handle_joy_input(self, now):
+        with self.state_lock:
+            if not self.enable_joy or self.goal_pose is None:
+                return False
+
+            axes = list(self.joy_axes)
+            buttons = list(self.joy_buttons)
+            prev_buttons = list(self.prev_joy_buttons)
+
+            if axes:
+                x_input = self._axis_value(axes, self.joy_axis_forward, invert=True)
+                y_input = self._axis_value(axes, self.joy_axis_lateral)
+                yaw_input = self._axis_value(axes, self.joy_axis_yaw)
+
+                self.goal_pose[0] += x_input * self.step_x * self.joy_axis_scale
+                self.goal_pose[1] += y_input * self.step_y * self.joy_axis_scale
+                self.goal_pose[5] = normalize_angle(
+                    self.goal_pose[5] + yaw_input * self.step_yaw * self.joy_axis_scale
+                )
+
+            if buttons:
+                z_input = (
+                    self._button_value(buttons, self.joy_button_up)
+                    - self._button_value(buttons, self.joy_button_down)
+                )
+                self.goal_pose[2] += z_input * self.step_z * self.joy_axis_scale
+
+                if self._button_rising_edge(buttons, prev_buttons, self.joy_button_hold):
+                    pose_snapshot = self._build_pose_snapshot_locked(now)
+                    if pose_snapshot is None:
+                        self.get_logger().warning('Controller hold ignored; waiting for IMU orientation.')
+                        self.prev_joy_buttons = list(buttons)
+                        return False
+                    self.goal_pose = pose_snapshot
+                    self._reset_pid_state(now)
+                    self.get_logger().info('Controller hold pressed. Holding current pose.')
+
+                if self._button_rising_edge(buttons, prev_buttons, self.joy_button_quit):
+                    self.prev_joy_buttons = list(buttons)
+                    return True
+
+            self.prev_joy_buttons = list(buttons)
             return False
-
-        axes = self.joy_axes
-        buttons = self.joy_buttons
-        prev_buttons = self.prev_joy_buttons
-
-        if axes:
-            x_input = self._axis_value(axes, self.joy_axis_forward, invert=True)
-            y_input = self._axis_value(axes, self.joy_axis_lateral)
-            yaw_input = self._axis_value(axes, self.joy_axis_yaw)
-
-            self.goal_pose[0] += x_input * self.step_x * self.joy_axis_scale
-            self.goal_pose[1] += y_input * self.step_y * self.joy_axis_scale
-            self.goal_pose[5] = normalize_angle(
-                self.goal_pose[5] + yaw_input * self.step_yaw * self.joy_axis_scale
-            )
-
-        if buttons:
-            z_input = (
-                self._button_value(buttons, self.joy_button_up)
-                - self._button_value(buttons, self.joy_button_down)
-            )
-            self.goal_pose[2] += z_input * self.step_z * self.joy_axis_scale
-
-            if self._button_rising_edge(buttons, prev_buttons, self.joy_button_hold):
-                self.goal_pose = list(self.current_pose)
-                self._reset_pid_state_locked(now)
-                self.get_logger().info('Controller hold pressed. Holding current pose.')
-
-            if self._button_rising_edge(buttons, prev_buttons, self.joy_button_quit):
-                self.prev_joy_buttons = list(buttons)
-                return True
-
-        self.prev_joy_buttons = list(buttons)
-        return False
 
     def publish_thrusters(self, thrusters):
         msg = Float64MultiArray()
@@ -286,10 +336,52 @@ class ThrusterTeleOp(Node):
     def timer_callback(self):
         now = time.monotonic()
         with self.state_lock:
-            should_quit = self._handle_joy_input_locked(now)
-            current_pose = None if self.current_pose is None else list(self.current_pose)
-            goal_pose = None if self.goal_pose is None else list(self.goal_pose)
             quaternion_wxyz = self.current_quaternion
+            current_position = (
+                None if self.current_position is None else list(self.current_position)
+            )
+            last_odom_time = self.last_odom_time
+
+        if quaternion_wxyz is None:
+            self.publish_zero_thrusters()
+            with self.state_lock:
+                if now - self.last_no_imu_warn >= 1.0:
+                    self.get_logger().warning(
+                        f'No valid IMU received on {self.imu_topic}; publishing zero thrusters.'
+                    )
+                    self.last_no_imu_warn = now
+            return
+
+        odom_is_fresh = (
+            last_odom_time is not None
+            and (now - last_odom_time) <= self.odometry_stale_timeout
+            and current_position is not None
+        )
+
+        if odom_is_fresh:
+            position_for_control = current_position
+        else:
+            position_for_control = [0.0, 0.0, 0.0]
+          
+        roll, pitch, yaw = quaternion_to_euler(*quaternion_wxyz)
+        pose_snapshot = [
+            position_for_control[0],
+            position_for_control[1],
+            position_for_control[2],
+            roll,
+            pitch,
+            yaw,
+        ]
+
+        with self.state_lock:
+            if self.goal_pose is None:
+                self.goal_pose = list(pose_snapshot)
+                self._reset_pid_state(now)
+                self.get_logger().info('IMU initialized. Goal seeded to current pose.')
+
+        should_quit = self._handle_joy_input(now)
+        with self.state_lock:
+            goal_pose = list(self.goal_pose)
             sum_err = list(self.sum_err)
             prev_pose_err = list(self.prev_pose_err)
             prev_time = self.prev_time
@@ -301,17 +393,10 @@ class ThrusterTeleOp(Node):
             rclpy.shutdown()
             return
 
-        if current_pose is None or goal_pose is None or quaternion_wxyz is None:
-            self.publish_zero_thrusters()
-            if now - self.last_no_odom_warn >= 1.0:
-                self.get_logger().warning('No odometry yet; publishing zero thrusters.')
-                self.last_no_odom_warn = now
-            return
-
         dt = 0.0 if prev_time is None else (now - prev_time)
 
         thrusters, pose_err, sum_err_next = compute_thruster_command(
-            current_pose=current_pose,
+            current_position=position_for_control,
             goal_pose=goal_pose,
             sum_err=sum_err,
             prev_pose_err=prev_pose_err,
