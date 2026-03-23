@@ -50,11 +50,11 @@ IMU.T_b_c1: !!opencv-matrix
           0.0, 0.0, 0.0, 1.0]
 IMU.InsertKFsWhenLost: 1
 
-ORBextractor.nFeatures: 1800
+ORBextractor.nFeatures: 2000
 ORBextractor.scaleFactor: 1.2
 ORBextractor.nLevels: 8
-ORBextractor.iniThFAST: 12
-ORBextractor.minThFAST: 5
+ORBextractor.iniThFAST: 10
+ORBextractor.minThFAST: 3
 
 Viewer.KeyFrameSize: 0.05
 Viewer.KeyFrameLineWidth: 1.0

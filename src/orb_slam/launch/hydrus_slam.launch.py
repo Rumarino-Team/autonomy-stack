@@ -50,6 +50,14 @@ def generate_launch_description():
             ])
         ),
         
+        # Thruster Teleop Node
+        Node(
+            package="controller_stonefish",
+            executable="thruster_teleop",
+            name="thruster_teleop",
+            output="screen"
+        ),
+        
         # ORB-SLAM3 Node
         Node(
             package="orb_slam3_ros2",
