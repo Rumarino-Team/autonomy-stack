@@ -1,0 +1,68 @@
+%YAML:1.0
+
+# Stonefish Hydrus RGB-D / visual-inertial configuration.
+# Intrinsics match the simulated 800x600 camera with 60 deg horizontal FOV.
+
+Camera.type: "PinHole"
+Camera.width: 800
+Camera.height: 600
+Camera.fx: 692.820323
+Camera.fy: 692.820323
+Camera.cx: 400.0
+Camera.cy: 300.0
+Camera.k1: 0.0
+Camera.k2: 0.0
+Camera.p1: 0.0
+Camera.p2: 0.0
+Camera.k3: 0.0
+Camera.fps: 20.0
+Camera.RGB: 1
+
+Camera.bf: 40.0
+ThDepth: 40.0
+DepthMapFactor: 1.0
+RGBD.DepthMapFactor: 1.0
+
+# Legacy inertial keys used by this ORB-SLAM3 checkout at startup.
+Tbc: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [1.0, 0.0, 0.0, 0.0,
+          0.0, 1.0, 0.0, 0.0,
+          0.0, 0.0, 1.0, 0.0,
+          0.0, 0.0, 0.0, 1.0]
+InsertKFsWhenLost: 1
+
+IMU.NoiseGyro: 1.0e-4
+IMU.NoiseAcc: 5.0e-3
+IMU.GyroWalk: 1.0e-6
+IMU.AccWalk: 5.0e-4
+IMU.Frequency: 200
+IMU.fastInit: 1
+IMU.T_b_c1: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [1.0, 0.0, 0.0, 0.0,
+          0.0, 1.0, 0.0, 0.0,
+          0.0, 0.0, 1.0, 0.0,
+          0.0, 0.0, 0.0, 1.0]
+IMU.InsertKFsWhenLost: 1
+
+ORBextractor.nFeatures: 1800
+ORBextractor.scaleFactor: 1.2
+ORBextractor.nLevels: 8
+ORBextractor.iniThFAST: 12
+ORBextractor.minThFAST: 5
+
+Viewer.KeyFrameSize: 0.05
+Viewer.KeyFrameLineWidth: 1.0
+Viewer.GraphLineWidth: 0.9
+Viewer.PointSize: 2.0
+Viewer.CameraSize: 0.08
+Viewer.CameraLineWidth: 3.0
+Viewer.ViewpointX: 0.0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+Viewer.ViewpointF: 500.0

@@ -18,7 +18,7 @@ def generate_launch_description():
             ]),
             launch_arguments={
                 'simulation_data': PathJoinSubstitution([FindPackageShare('controller_stonefish'), 'data']),
-                'scenario_desc': PathJoinSubstitution([FindPackageShare('controller_stonefish'), 'data', 'scenarios', 'pool_env.scn']),
+                'scenario_desc': PathJoinSubstitution([FindPackageShare('controller_stonefish'), 'data', 'scenarios', 'hydrus_env.scn']),
                 'simulation_rate': '300.0',
                 'window_res_x': '1920',
                 'window_res_y': '1080',
