@@ -1,11 +1,11 @@
 use nalgebra::{
-    Point3, UnitQuaternion, Vector2, Vector3
+    Point3, UnitQuaternion, Vector2, Vector3, Vector6
 };
 
 use crate::{
     MapObject, Mission, MissionExecutor, ObjectCls,
 };
-use std::sync::atomic::Ordering;
+use std::{sync::{atomic::Ordering, Arc}, thread::sleep, time::Duration};
 
 // this could hold some state if necessary
 // like the some sort of queue if a sequence of reactions is necessary
@@ -209,5 +209,42 @@ impl DropIntoBoxMission {
         let shark_object = MapObject::from(&objects[self.shark_idx]);
         let sword_fish_object = MapObject::from(&objects[self.sword_fish_idx]);
         todo!("actually drop thing in prefered side")
+    }
+}
+
+pub(crate) struct CardinalDirections {}
+
+impl Mission for CardinalDirections {
+    fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
+        let sub = **td.pose.load();
+        let sub_vec = Vector6::new(
+            sub.pos[0], sub.pos[1], sub.pos[2], 
+            sub.rot[0], sub.rot[1], sub.rot[2]
+        );
+        let cardinals = [
+            Vector2::new( 10.0,  00.0),
+            Vector2::new( 00.0,  10.0),
+            Vector2::new(-10.0,  00.0),
+            Vector2::new( 00.0, -10.0),
+        ];
+
+        loop {
+            for cardinal in cardinals {
+                let mut goal = sub_vec;
+                goal.x += cardinal.x;
+                goal.y += cardinal.y;
+                _ = td.goal.swap(Arc::new(goal));
+                r2r::log_info!("cardinal", "--------------------------------------");
+                r2r::log_info!("cardinal", "{cardinal:?}");
+                r2r::log_info!("cardinal", "--------------------------------------");
+                sleep(Duration::from_secs(10));
+            }
+        }
+    }
+}
+
+impl CardinalDirections {
+    pub(crate) fn new() -> Self {
+        Self {}
     }
 }

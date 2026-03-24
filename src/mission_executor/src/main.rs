@@ -296,6 +296,7 @@ async fn main() {
             ParameterValue::String(str) => match str.as_str() {
                 "prequalify" => Box::new(missions::PrecualifyMission::new()),
                 "drop_into_box" => Box::new(missions::DropIntoBoxMission::new()),
+                "cardinal_directions" => Box::new(missions::CardinalDirections::new()),
                 _ => panic!("mission_name param must be a mission that exists"),
             },
             _ => panic!("mission_name param must be passed a string"),
@@ -319,11 +320,24 @@ async fn main() {
 
     let tam_x_y_z_roll_pitch_yaw: MatrixXx6<f64> = match controller_name.as_str() {
         "stonefish_hydrus" =>
+            // Y is foward
+            // with X (sideways movement)
+            // MatrixXx6::from_rows(&[
+            //     Matrix1x6::new(-1.0,  1.0,  0.0,  0.0,  0.0,  1.0),
+            //     Matrix1x6::new(-1.0, -1.0,  0.0,  0.0,  0.0, -1.0),
+            //     Matrix1x6::new( 1.0,  1.0,  0.0,  0.0,  0.0, -1.0),
+            //     Matrix1x6::new( 1.0, -1.0,  0.0,  0.0,  0.0,  1.0),
+            //     Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
+            //     Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
+            //     Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
+            //     Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
+            // ]),
+            // without X (sideways movement)
             MatrixXx6::from_rows(&[
-                Matrix1x6::new(-1.0,  1.0,  0.0,  0.0,  0.0,  1.0),
-                Matrix1x6::new(-1.0, -1.0,  0.0,  0.0,  0.0, -1.0),
-                Matrix1x6::new( 1.0,  1.0,  0.0,  0.0,  0.0, -1.0),
-                Matrix1x6::new( 1.0, -1.0,  0.0,  0.0,  0.0,  1.0),
+                Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0,  1.0),
+                Matrix1x6::new( 0.0, -1.0,  0.0,  0.0,  0.0, -1.0),
+                Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0, -1.0),
+                Matrix1x6::new( 0.0, -1.0,  0.0,  0.0,  0.0,  1.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
@@ -452,7 +466,22 @@ async fn main() {
             // r2r::log_info!("goal", "{goal:?}");
             // r2r::log_info!("pose", "{current_pose:?}");
 
-            let pose_err = goal - current_pose;
+            let mut pose_err = goal - current_pose;
+
+            let rot = UnitQuaternion::from_quaternion(pose.rot);
+            let forward = rot * Vector3::y(); // if vehicle’s forward is +Y in body frame
+
+            let dir = Vector3::new(pose_err[0], pose_err[1], 0.0);
+            let dir = if dir.norm() > 1e-6 { dir.normalize() } else { forward };
+
+            // rotation from current forward → target direction
+            let yaw_quat = UnitQuaternion::rotation_between(&forward, &dir)
+                .unwrap_or(UnitQuaternion::identity());
+
+            let (_, _, yaw_error) = yaw_quat.euler_angles();
+
+            pose_err[5] = yaw_error;
+
             let vel_err = (pose_err - prev_pose_err) / dt;
             sum_err += pose_err * dt;
 
@@ -460,13 +489,18 @@ async fn main() {
                 + ki.component_mul(&sum_err)
                 + kd.component_mul(&vel_err);
 
-            let rotated = unit.conjugate() * wrench.xyz();
+            let mut rotated = unit.conjugate() * wrench.xyz();
             let xy_error = wrench.xy().norm();
-            // only apply yaw when close
-            let yaw_scale = if xy_error < 0.5 { 1.0 } else { 0.0 };
 
+            // only move in xy if aprox looking at goal
+            rotated.x = rotated.x.max(0.0);
+            rotated.y = rotated.y.max(0.0);
+            if yaw_error.abs() > std::f64::consts::PI / 8.0 {
+                rotated.x = 0.0;
+                rotated.y = 0.0;
+            }
             let input_x_y_z_roll_pitch_yaw
-                = Vector6::new(rotated.x, rotated.y, wrench.z, -wrench[3], wrench[4], wrench[5] * yaw_scale);
+                = Vector6::new(rotated.x, rotated.y, wrench.z, -wrench[3], wrench[4], wrench[5]);
 
             // r2r::log_info!("wrench", "{wrench:?}");
             // r2r::log_info!("rotated", "{rotated:?}");
