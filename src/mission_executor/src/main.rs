@@ -343,7 +343,7 @@ async fn main() {
                 Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
             ]),
-        "stonefish_proteus" =>
+        "stonefish_proteus" | "real_proteus" =>
             MatrixXx6::from_rows(&[
                 Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0,  1.0),
                 Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0, -1.0),

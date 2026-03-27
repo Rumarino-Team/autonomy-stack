@@ -9,6 +9,7 @@ public:
   Controller();
 
   rclcpp::Subscription<Float64MultiArray>::SharedPtr thrusters_sub;
+  const int *pins;
 
 private:
   // Serial command format:

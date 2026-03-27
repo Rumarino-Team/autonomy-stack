@@ -207,4 +207,19 @@ chmod +x build.sh
 sudo ./build.sh
 ```
 
+## Run
 
+```sh
+# Source ROS 2 environment
+source /opt/ros/jazzy/setup.bash
+
+# Build packages (TODO: remeber about detections stuff)
+colcon build --packages-select interfaces bringup controller_arduino mission_executor --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+# Source the workspace
+source install/setup.bash
+
+# Run (proteuus) (TODO: make launch file for running)
+ros2 launch bringup run.launch.py mission_name:=prequalify controller_name:=stonefish_proteus control_port:=/dev/ttyACM0 baud_rate:=115200
+
+```
