@@ -118,8 +118,12 @@ colcon build --packages-select interfaces bringup Stonefish stonefish_ros2 contr
 # Source the workspace
 source install/setup.bash
 
-# Run with GUI
+# Run with GUI (hydrus)
 ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify controller_name:=stonefish_hydrus env_file_name:=hydrus_env.scn
+
+# Run with GUI (proteus)
+ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify controller_name:=stonefish_proteus env_file_name:=proteus_env.scn
+```
 ```
 
 ## Thruster Teleop

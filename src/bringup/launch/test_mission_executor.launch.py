@@ -33,7 +33,7 @@ def generate_launch_description():
             executable='detection_mocker',
             parameters=[{
                 'scn_file_path': PathJoinSubstitution([FindPackageShare('controller_stonefish'), 'data', 'scenarios', env_file_name]),
-                'robot_scn_file_path': PathJoinSubstitution([FindPackageShare('controller_stonefish'), 'data', 'scenarios', 'hydrus_auv.scn']),
+                'robot_scn_file_path': PathJoinSubstitution([FindPackageShare('controller_stonefish'), 'data', 'scenarios', 'proteus_auv.scn']),
                 'odometry_topic': '/hydrus/odometry',
                 'map_output_topic': '/hydrus/map',
                 'publish_all_objects': True,

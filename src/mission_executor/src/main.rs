@@ -335,21 +335,21 @@ async fn main() {
             // without X (sideways movement)
             MatrixXx6::from_rows(&[
                 Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0,  1.0),
-                Matrix1x6::new( 0.0, -1.0,  0.0,  0.0,  0.0, -1.0),
                 Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0, -1.0),
+                Matrix1x6::new( 0.0, -1.0,  0.0,  0.0,  0.0, -1.0),
                 Matrix1x6::new( 0.0, -1.0,  0.0,  0.0,  0.0,  1.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
             ]),
         "stonefish_proteus" =>
             MatrixXx6::from_rows(&[
-                Matrix1x6::new(-1.0,  0.0,  0.0,  0.0,  0.0,  1.0),
-                Matrix1x6::new(-1.0,  0.0,  0.0,  0.0,  0.0, -1.0),
+                Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0,  1.0),
+                Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0, -1.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
+                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
                 Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
             ]),
         _ => unimplemented!("no tam for {controller_name}"),

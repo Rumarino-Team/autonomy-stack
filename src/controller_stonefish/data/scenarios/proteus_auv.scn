@@ -49,10 +49,9 @@
 
 		<ros_subscriber thrusters="/hydrus/thrusters" />
 
-		<!-- Corner Thrusters -->
-		<actuator name="thruster_0_front_left" type="thruster">
+		<actuator name="thruster_0_left" type="thruster">
 			<link name="Hydrus" />
-			<origin rpy="0.0 0.0 -1.1781" xyz="0.198 0.407 0.0" />
+			<origin rpy="0.0 0.0 4.7123" xyz="0.198 0.0 0.0" />
 			<specs max_setpoint="${1000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.18" right="true">
@@ -71,51 +70,9 @@
 			</thrust_model>
 		</actuator>
 
-		<actuator name="thruster_1_front_right" type="thruster">
+		<actuator name="thruster_1_right" type="thruster">
 			<link name="Hydrus" />
-			<origin rpy="0.0 0.0 -1.9635" xyz="-0.198 0.407 0.0" />
-			<specs max_setpoint="${1000.0/60.0*2.0*pi}" inverted_setpoint="true"
-				normalized_setpoint="true" />
-			<propeller diameter="0.18" right="true">
-				<mesh filename="models/propeller.obj" scale="0.75" />
-				<material name="pvc" />
-				<look name="propeller" />
-			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
-			</rotor_dynamics>
-			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.48" reverse="0.48" />
-				<torque_coeff value="0.05" />
-			</thrust_model>
-		</actuator>
-
-		<actuator name="thruster_2_back_left" type="thruster">
-			<link name="Hydrus" />
-			<origin rpy="0.0 0.0 1.1781" xyz="0.198 -0.408 0.0" />
-			<specs max_setpoint="${1000.0/60.0*2.0*pi}" inverted_setpoint="true"
-				normalized_setpoint="true" />
-			<propeller diameter="0.18" right="true">
-				<mesh filename="models/propeller.obj" scale="0.75" />
-				<material name="pvc" />
-				<look name="propeller" />
-			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
-			</rotor_dynamics>
-			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.48" reverse="0.48" />
-				<torque_coeff value="0.05" />
-			</thrust_model>
-		</actuator>
-
-		<actuator name="thruster_3_back_right" type="thruster">
-			<link name="Hydrus" />
-			<origin rpy="0.0 0.0 1.9635" xyz="-0.198 -0.408 0.0" />
+			<origin rpy="0.0 0.0 4.7123" xyz="-0.198 0.0 0.0" />
 			<specs max_setpoint="${1000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.18" right="true">
@@ -135,9 +92,10 @@
 		</actuator>
 
 		<!-- Depth Thrusters -->
-		<actuator name="thruster_4_depth_front_left" type="thruster">
+
+		<actuator name="thruster_2_depth_front_left" type="thruster">
 			<link name="Hydrus" />
-			<origin rpy="0.0 -1.571 0.0" xyz="0.211 0.169 0.0" />
+			<origin rpy="0.0 -1.571 0.0" xyz="0.211 0.300 0.0" />
 			<specs max_setpoint="${1000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.18" right="true">
@@ -156,9 +114,9 @@
 			</thrust_model>
 		</actuator>
 
-		<actuator name="thruster_5_front_right" type="thruster">
+		<actuator name="thruster_3_depth_front_right" type="thruster">
 			<link name="Hydrus" />
-			<origin rpy="0.0 -1.571 0.0" xyz="-0.211 0.169 0.0" />
+			<origin rpy="0.0 -1.571 0.0" xyz="-0.211 0.300 0.0" />
 			<specs max_setpoint="${1000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.18" right="true">
@@ -177,9 +135,9 @@
 			</thrust_model>
 		</actuator>
 
-		<actuator name="thruster_6_depth_back_left" type="thruster">
+		<actuator name="thruster_4_depth_back_left" type="thruster">
 			<link name="Hydrus" />
-			<origin rpy="0.0 -1.571 0.0" xyz="0.211 -0.169 0.0" />
+			<origin rpy="0.0 -1.571 0.0" xyz="0.211 -0.300 0.0" />
 			<specs max_setpoint="${1000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.18" right="true">
@@ -198,9 +156,9 @@
 			</thrust_model>
 		</actuator>
 
-		<actuator name="thruster_7_back_right" type="thruster">
+		<actuator name="thruster_5_depth_back_right" type="thruster">
 			<link name="Hydrus" />
-			<origin rpy="0.0 -1.571 0.0" xyz="-0.211 -0.169 0.0" />
+			<origin rpy="0.0 -1.571 0.0" xyz="-0.211 -0.300 0.0" />
 			<specs max_setpoint="${1000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.18" right="true">
