@@ -44,6 +44,7 @@ setup(
     entry_points={
         'console_scripts': [
             'thruster_teleop = controller_stonefish.thruster_teleop:main',
+            'imu_thingy = controller_stonefish.imu_thingy:main',
             'launch_torpedo = controller_stonefish.launch_torpedo:main',
             'drop_sphere = controller_stonefish.drop_sphere:main',
         ],
