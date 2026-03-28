@@ -213,7 +213,7 @@ sudo ./build.sh
 # Source ROS 2 environment
 source /opt/ros/jazzy/setup.bash
 
-# Build packages (TODO: remeber about detections stuff)
+# Build packages (TODO: remember about detections stuff)
 colcon build --packages-select interfaces bringup controller_arduino mission_executor --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Source the workspace
