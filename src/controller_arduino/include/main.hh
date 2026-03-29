@@ -9,17 +9,10 @@ public:
   Controller();
 
   rclcpp::Subscription<Float64MultiArray>::SharedPtr thrusters_sub;
-  const int *pins;
 
 private:
   // Serial command format:
-  // - T1:value - Thruster 1 with specified PWM value (1000-2000)
-  // - T2:value - Thruster 2 with specified PWM value
-  // - T3:value - Thruster 3 with specified PWM value
-  // - T4:value - Thruster 4 with specified PWM value
-  // - D:value  - Depth motors with specified PWM value
-  // - P:value  - Torpedo with specified PWM value
-  // - C:value  - Camera motor angle (-60 to 60 degrees)
+  // - T<NTH_THRUSTER>:<VALUE>\n - NTH_THRUSTER with VALUE (-1 (rev) .. 1 (fwd))
   std::fstream arduino;
 
   void handle_thrusters_msg(const Float64MultiArray::SharedPtr thrusters);

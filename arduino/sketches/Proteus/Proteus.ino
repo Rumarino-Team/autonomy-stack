@@ -6,7 +6,7 @@
 #define PULSE_WIDTH_NEUTRAL 1500
 #define PINS_COUNT 6
 
-const int PINS_PROTEUS[PINS_COUNT] = {7, 6, 3, 2, 4, 5};
+const int PINS[PINS_COUNT] = {7, 6, 3, 2, 4, 5};
 Servo servos[PINS_COUNT];
 
 String inputString = "";
@@ -18,12 +18,12 @@ void setup() {
 
   Serial.println("Initializing thrusters...");
   for (int i = 0; i < PINS_COUNT; i += 1){
-      servos[i].attach(PINS_PROTEUS[i]);
+      servos[i].attach(PINS[i]);
       servos[i].writeMicroseconds(PULSE_WIDTH_NEUTRAL);  // This sets the thrusters output force to 0 lbf
       Serial.print("Initialized thruster ");
       Serial.print(i);
       Serial.print(" (pin ");
-      Serial.print(PINS_PROTEUS[i]);
+      Serial.print(PINS[i]);
       Serial.println(") to neutral position");
   }
   delay(5000);
@@ -64,7 +64,8 @@ void processSerialCommands() {
   char cmd_type = inputString.charAt(0);
   switch (cmd_type) {
   case 'T': {
-    int pulse_width = inputString.substring(colon_pos + 1).toInt();
+    int value = inputString.substring(colon_pos + 1).toFloat();
+    float pulse_width = 1500 + 400 * value;
 
     if (pulse_width < PULSE_WIDTH_MIN) {
       pulse_width = PULSE_WIDTH_MIN;
@@ -72,24 +73,19 @@ void processSerialCommands() {
       pulse_width = PULSE_WIDTH_MAX;
     }
 
-    int pin = inputString.substring(1, colon_pos).toInt();
+    int thruster_index = inputString.substring(1, colon_pos).toInt();
 
+    Serial.print("thruster_index = ");
+    Serial.println(thruster_index);
     Serial.print("pin = ");
-    Serial.println(pin);
+    Serial.println(PINS[thruster_index]);
     Serial.print("pulse_width = ");
     Serial.println(pulse_width);
 
-    int pin_index = -1;
-    for (int i = 0; i < PINS_COUNT; i += 1) {
-      if (PINS_PROTEUS[i] == pin) {
-        pin_index = i;
-        break;
-      }
-    }
     if (pin_index == -1) {
       Serial.println("Invalid Pin");
     } else {
-      servos[pin_index].writeMicroseconds(pulse_width);
+      servos[thruster_index].writeMicroseconds(pulse_width);
     }
 
     break;

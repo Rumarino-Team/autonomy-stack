@@ -1,13 +1,8 @@
 #include <main.hh>
 
-// TODO: figure out pins for hydrus
-const int PINS_HYDRUS[] = {};
-const int PINS_PROTEUS[] = {7, 6, 3, 2, 4, 5};
-
 Controller::Controller() : Node("controller") {
   this->declare_parameter<std::string>("control_port");
   this->declare_parameter<int>("baud_rate", 115200);
-  this->declare_parameter<std::string>("controller_name");
 
   std::string control_port;
   if (!this->get_parameter("control_port", control_port)) {
@@ -17,16 +12,6 @@ Controller::Controller() : Node("controller") {
   int baud_rate;
   if (!this->get_parameter("baud_rate", baud_rate)) {
     RCLCPP_WARN(this->get_logger(), "baud_rate not set!");
-  }
-
-  std::string controller_name;
-  if (!this->get_parameter("controller_name", controller_name)) {
-    RCLCPP_FATAL(this->get_logger(), "controller_name not set!");
-  }
-  if (controller_name == "real_proteus") {
-    pins = PINS_PROTEUS;
-  } else {
-    RCLCPP_FATAL(this->get_logger(), "controller_name is not implemented");
   }
 
   std::ostringstream oss;
@@ -50,10 +35,7 @@ Controller::Controller() : Node("controller") {
 
 void Controller::handle_thrusters_msg(const Float64MultiArray::SharedPtr thruster_values) {
   for (int i = 0; i < thruster_values->data.size(); i += 1) {
-    // TODO: this pwm mapping may not be the same hydrus does
-    // map -1 to 1 to 1100 to 1900, whre 0 -> 1500
-    auto pwm = 1500 + 400 *  thruster_values->data[i];
-    arduino << 'T' << pins[i] << ':' << thruster_values->data[i] << '\n';
+    arduino << 'T' << i << ':' << thruster_values->data[i] << '\n';
   }
 }
 
