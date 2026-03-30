@@ -5,6 +5,7 @@
 //! respective sequences of actions.
 
 mod missions;
+mod teleop;
 mod navigation;
 
 use std::sync::Arc;
@@ -297,6 +298,7 @@ async fn main() {
                 "prequalify" => Box::new(missions::PrecualifyMission::new()),
                 "drop_into_box" => Box::new(missions::DropIntoBoxMission::new()),
                 "cardinal_directions" => Box::new(missions::CardinalDirections::new()),
+                "teleop" => Box::new(teleop::TeleopMission::new()),
                 _ => panic!("mission_name param must be a mission that exists"),
             },
             _ => panic!("mission_name param must be passed a string"),
