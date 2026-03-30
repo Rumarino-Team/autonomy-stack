@@ -102,84 +102,6 @@ sudo make install
 cd ../../../../../
 ```
 
-## Test mission_executor
-
-### With GUI (local development)
-```sh
-# Navigate to the workspace
-cd ~/ros2_ws/rumarino-ros2-jazzy
-
-# Source ROS 2 environment
-source /opt/ros/jazzy/setup.bash
-
-# Build packages
-colcon build --packages-select interfaces bringup Stonefish stonefish_ros2 controller_stonefish  detection_mocker mission_executor
-
-# Source the workspace
-source install/setup.bash
-
-# Run with GUI (hydrus)
-ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify controller_name:=stonefish_hydrus env_file_name:=hydrus_env.scn
-
-# Run with GUI (proteus)
-ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify controller_name:=stonefish_proteus env_file_name:=proteus_env.scn
-```
-```
-
-## Thruster Teleop
-
-### Run simulator + teleop
-```sh
-# Terminal 1: launch simulator
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-ros2 launch controller_stonefish hydrussim.launch.py
-
-# Terminal 2: run teleop controller
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-ros2 run controller_stonefish thruster_teleop
-```
-
-### Keyboard controls
-- `w/s`: increase/decrease x goal
-- `r/f`: increase/decrease y goal
-- `q/e`: increase/decrease z goal
-- `a/d`: increase/decrease yaw goal
-- `x`: hold current pose and reset PID history
-- `z`: quit teleop
-
-### PS5 controller support
-`thruster_teleop` subscribes to `/joy` (`sensor_msgs/msg/Joy`).
-
-```sh
-# Terminal 3 (if using a controller)
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-ros2 run joy joy_node
-```
-
-Default mapping in teleop:
-- Left stick Y: x goal
-- Left stick X: y goal
-- Right stick X: yaw goal
-- L1 / R1: z up / z down
-- Cross: hold current pose
-- Circle: quit
-
-### Use NVIDIA GPU for simulation
-If you want to force NVIDIA offload for the simulator, run:
-
-```sh
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only ros2 launch controller_stonefish hydrussim.launch.py
-```
-## IMU VN100 test launch
-```bash
-source install/setup.bash
-ros2 launch bringup vn100.launch.py port:=/dev/ttyUSB0 baud:=115200 
-```
-
-
 ## Computer Vision
 
 ### ZED Custom Wrapper
@@ -191,9 +113,6 @@ ros2 launch bringup vn100.launch.py port:=/dev/ttyUSB0 baud:=115200
 ```sh
 colcon build --packages-select zed_msg zed_custom_wrapper && source ./install/setup.bash && ros2 launch zed_custom_wrapper zed_custom.launch.py onnx_model_path:=./src/zed_custom_wrapper/yolov8n.onnx
 ```
-
-:
-
 
 ### Building Orb Slam
 ```bash
@@ -207,19 +126,73 @@ chmod +x build.sh
 sudo ./build.sh
 ```
 
-## Run
 
+
+
+## Build using bridge_stonefish
+```sh
+# Source ROS 2 environment
+source /opt/ros/jazzy/setup.bash
+
+# Build packages
+colcon build \
+    --packages-select interfaces bringup mission_executor bridge_stonefish Stonefish stonefish_ros2 detection_mocker
+
+# Source the workspace
+source install/setup.bash
+```
+
+## Simulate Missions using bridge_stonefish
+```sh
+# proteus, prequalify mission
+ros2 launch bringup stonefish.launch.py \
+    mission_name:=prequalify \
+    auv_name:=proteus \
+    env_file_name:=proteus_env.scn \
+    auv_file_name:=proteus_auv.scn \
+    headless:=false
+
+# hydrus, prequalify mission
+ros2 launch bringup stonefish.launch.py \
+    mission_name:=prequalify \
+    auv_name:=hydrus \
+    env_file_name:=hydrus_env.scn \
+    auv_file_name:=hydrus_auv.scn \
+    headless:=false
+
+# proteus, teleop mission
+# if you don't have xterm
+# sudo apt install xterm
+# sudo dnf install xterm
+ros2 launch bringup stonefish.launch.py \
+    mission_name:=teleop \
+    auv_name:=proteus \
+    env_file_name:=proteus_env.scn \
+    auv_file_name:=proteus_auv.scn \
+    headless:=false
+```
+
+## Test using bridge_stonefish
+```sh
+# TODO
+```
+
+## Build & Run proteus using bridge_hardware
 ```sh
 # Source ROS 2 environment
 source /opt/ros/jazzy/setup.bash
 
 # Build packages (TODO: remember about detections stuff)
-colcon build --packages-select interfaces bringup controller_arduino mission_executor --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+colcon build \
+    --packages-select interfaces bringup mission_executor bridge_hardware \
+    --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Source the workspace
 source install/setup.bash
 
-# Run (proteuus) (TODO: make launch file for running)
-ros2 launch bringup run.launch.py mission_name:=prequalify controller_name:=stonefish_proteus control_port:=/dev/ttyACM0 baud_rate:=115200
-
+# Run
+ros2 launch bringup hardware_proteus.launch.py \
+    mission_name:=prequalify \
+    arduino_port:=/dev/ttyACM0 arduino_baud_rate:=115200 \
+    vn100_port:=/dev/ttyUSB0 vn100_baud_rate:=115200
 ```

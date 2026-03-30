@@ -79,7 +79,7 @@ namespace detection_mocker
     this->declare_parameter("scn_file_path", "");
     this->declare_parameter("robot_scn_file_path", "");
     this->declare_parameter("mesh_base_path", "");
-    this->declare_parameter("odometry_topic", "/hydrus/odometry");
+    this->declare_parameter("odometry_topic", "/vision/odometry");
     this->declare_parameter("map_output_topic", "/map");
     this->declare_parameter("publish_rate_hz", 10.0);
     this->declare_parameter("min_detection_distance", 0.1);

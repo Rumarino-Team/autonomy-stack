@@ -1,8 +1,10 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>controller_arduino</name>
+  <name>bridge_hardware</name>
   <version>0.0.1</version>
-  <description>Orders around the arduino via serial for movement and torpedos</description>
+  <description>
+    Wraps serial comunication with physical thrusters and IMUs.
+  </description>
 
   <maintainer email="jose.burgos40@upr.edu">José Burgos Guntín</maintainer>
   <license>Apache-2.0</license>

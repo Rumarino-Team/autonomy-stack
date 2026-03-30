@@ -44,7 +44,17 @@ impl From<&r2r::geometry_msgs::msg::Pose> for Pose {
     }
 }
 
+impl From<Pose> for Vector6<f64> {
+    fn from(value: Pose) -> Self {
+        let p = value.pos;
+        let unit = UnitQuaternion::from_quaternion(value.rot);
+        let (roll, pitch, yaw) = unit.euler_angles();
+        Vector6::new(p.x, p.y, p.z, roll, pitch, yaw)
+    }
+}
+
 struct MissionExecutor {
+    pub node: Arc<std::sync::Mutex<Node>>,
     pub map: ArcSwap<MapMsg>,
     pub map_objects_reacted: AtomicUsize,
     pub new_objects: Notify,
@@ -57,7 +67,7 @@ struct MissionExecutor {
 const CLOSE_ENOUGH: f64 = 1.0;
 
 impl MissionExecutor {
-    pub fn new() -> Self {
+    pub fn new(node: Node) -> Self {
         // hardcoded so it doesn't freak out while it waits for first odometry
         let origin = Pose {
             pos: Vector3::new(-3.0, 1.0, 1.0),
@@ -69,6 +79,7 @@ impl MissionExecutor {
         goal.fixed_rows_mut::<3>(3)
             .copy_from(&Vector3::new(roll, pitch, yaw));
         Self {
+            node: Arc::new(std::sync::Mutex::new(node)),
             map: ArcSwap::new(Arc::new(MapMsg::default())),
             map_objects_reacted: AtomicUsize::new(0),
             new_objects: Notify::new(),
@@ -198,7 +209,7 @@ trait Mission: Send + Sync {
 }
 
 #[derive(Debug, Clone)]
-struct ControllerConfig {
+struct PidConfig {
     kp: Vector6<f64>,
     ki: Vector6<f64>,
     kd: Vector6<f64>,
@@ -206,7 +217,8 @@ struct ControllerConfig {
 
 #[derive(Debug, Clone)]
 struct LiveConfig {
-    controllers: std::collections::HashMap<String, ControllerConfig>,
+    pid: std::collections::HashMap<String, PidConfig>,
+    tam: MatrixXx6<f64>,
 }
 
 fn read_vec6(table: &toml_edit::Table, key: &str) -> Vector6<f64> {
@@ -221,20 +233,40 @@ fn read_vec6(table: &toml_edit::Table, key: &str) -> Vector6<f64> {
     }
 }
 
-fn load_config(path: &str) -> LiveConfig {
+fn load_config(path: &str, auv_name: &str) -> LiveConfig {
     let content = std::fs::read_to_string(path).unwrap_or_default();
     let doc = content
         .parse::<toml_edit::DocumentMut>()
         .unwrap_or_else(|_| toml_edit::DocumentMut::new());
 
 
-    let mut controllers_map = std::collections::HashMap::new();
+    let Some(auv) = doc.get(auv_name).and_then(|v| v.as_table()) else {
+        panic!("couldn't find [{auv_name}] in {path}");
+    };
 
-    if let Some(controllers) = doc.get("controllers").and_then(|t| t.as_table()) {
-        for (name, table) in controllers.iter() {
+    let Some(tam_arr) = auv.get("tam").and_then(|v| v.as_array()) else {
+        panic!("expected tam field in {path}");
+    };
+    let rows = tam_arr.len();
+    let mut data = Vec::with_capacity(rows * 6);
+
+    for row in tam_arr.iter() {
+        if let Some(row_arr) = row.as_array() {
+            for val in row_arr.iter().take(6) {
+                data.push(val.as_float().unwrap_or(0.0));
+            }
+        } else {
+            data.extend_from_slice(&[0.0; 6]);
+        }
+    }
+
+    let tam = MatrixXx6::from_row_slice(&data);
+
+    let mut pid_map = std::collections::HashMap::new();
+    if let Some(pids) = auv.get("pid").and_then(|t| t.as_table()) {
+        for (name, table) in pids.iter() {
             if let Some(table) = table.as_table() {
-
-                controllers_map.insert(name.to_string(), ControllerConfig {
+                pid_map.insert(name.to_string(), PidConfig {
                     kp: read_vec6(table, "kp"),
                     ki: read_vec6(table, "ki"),
                     kd: read_vec6(table, "kd"),
@@ -243,14 +275,14 @@ fn load_config(path: &str) -> LiveConfig {
         }
     }
 
-    LiveConfig { controllers: controllers_map }
+    LiveConfig { pid: pid_map, tam }
 }
 
 fn save_config(path: &str, cfg: &LiveConfig) {
     let mut doc = toml_edit::DocumentMut::new();
     let mut controllers = toml_edit::Table::new();
 
-    for (name, thing) in &cfg.controllers {
+    for (name, thing) in &cfg.pid {
         let mut table = toml_edit::Table::new();
 
         let mut arr = toml_edit::Array::new();
@@ -306,71 +338,45 @@ async fn main() {
         None => panic!("mission_name param must be passed to mission_executor"),
     };
 
-    let controller_name = match params.get("controller_name") {
+    let live_config_path = match params.get("live_config_path") {
         Some(r2r::Parameter { value, .. }) => match value {
-            // get the tam and stored values for PID runtime "constants"
-            ParameterValue::String(str) => match str.as_str() {
-                "stonefish_hydrus" => str,
-                "stonefish_proteus" => str,
-                "real_proteus" => str,
-                _ => panic!("controller_name param must be a controller that exists"),
-            },
-            _ => panic!("controller_name param must be passed a string"),
+            ParameterValue::String(str) => str.to_owned(),
+            _ => panic!("live_config_path param must be passed a string"),
         },
-        None => panic!("controller_name param must be passed to mission_executor"),
-    }.to_owned();
+        None => panic!("live_config_path param must be passed to mission_executor"),
+    };
+    r2r::log_info!("live_config_path", "{live_config_path:?}");
 
-    let tam_x_y_z_roll_pitch_yaw: MatrixXx6<f64> = match controller_name.as_str() {
-        "stonefish_hydrus" =>
-            // Y is foward
-            // with X (sideways movement)
-            // MatrixXx6::from_rows(&[
-            //     Matrix1x6::new(-1.0,  1.0,  0.0,  0.0,  0.0,  1.0),
-            //     Matrix1x6::new(-1.0, -1.0,  0.0,  0.0,  0.0, -1.0),
-            //     Matrix1x6::new( 1.0,  1.0,  0.0,  0.0,  0.0, -1.0),
-            //     Matrix1x6::new( 1.0, -1.0,  0.0,  0.0,  0.0,  1.0),
-            //     Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
-            //     Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
-            //     Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
-            //     Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
-            // ]),
-            // without X (sideways movement)
-            MatrixXx6::from_rows(&[
-                Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0,  1.0),
-                Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0, -1.0),
-                Matrix1x6::new( 0.0, -1.0,  0.0,  0.0,  0.0, -1.0),
-                Matrix1x6::new( 0.0, -1.0,  0.0,  0.0,  0.0,  1.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
-            ]),
-        "stonefish_proteus" | "real_proteus" =>
-            MatrixXx6::from_rows(&[
-                Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0,  1.0),
-                Matrix1x6::new( 0.0,  1.0,  0.0,  0.0,  0.0, -1.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0,  1.0,  0.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0,  1.0, -1.0,  0.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0,  1.0,  0.0),
-                Matrix1x6::new( 0.0,  0.0, -1.0, -1.0, -1.0,  0.0),
-            ]),
-        _ => unimplemented!("no tam for {controller_name}"),
+    let bridge_name = match params.get("bridge_name") {
+        Some(r2r::Parameter { value, .. }) => match value {
+            ParameterValue::String(str) => str.to_owned(),
+            _ => panic!("bridge_name param must be passed a string"),
+        },
+        None => panic!("bridge_name param must be passed to mission_executor"),
+    };
+
+    let auv_name = match params.get("auv_name") {
+        Some(r2r::Parameter { value, .. }) => match value {
+            ParameterValue::String(str) => str.to_owned(),
+            _ => panic!("auv_name param must be passed a string"),
+        },
+        None => panic!("auv_name param must be passed to mission_executor"),
     };
 
     drop(params);
 
-    let td = Arc::new(MissionExecutor::new());
-
     let map_qos = QosProfile::default().keep_last(1).transient_local();
     let mut map_sub = node
-        .subscribe::<MapMsg>("/hydrus/map", map_qos)
+        .subscribe::<MapMsg>("/vision/map", map_qos)
         .expect("Failed to subscribe to map");
     let mut odometry_sub = node
-        .subscribe::<OdometryMsg>("/hydrus/odometry", QosProfile::default())
+        .subscribe::<OdometryMsg>("/bridge/odometry", QosProfile::default())
         .expect("Failed to subscribe to odometry");
     let thrusters_pub = node
-        .create_publisher::<Float64MultiArray>("/hydrus/thrusters", QosProfile::default())
+        .create_publisher::<Float64MultiArray>("/bridge/thrusters", QosProfile::default())
         .expect("Failed to setup thruster publisher");
+
+    let td = Arc::new(MissionExecutor::new(node));
 
     let consume_map_sub = |td: Arc<MissionExecutor>| async move {
         while let Some(msg) = map_sub.next().await {
@@ -385,12 +391,12 @@ async fn main() {
         }
     };
 
-    let path = "./src/mission_executor/live_config.toml";
-    let path_buf = std::fs::canonicalize(path).unwrap();
+    // let path = "./src/mission_executor/live_config.toml";
+    let path_buf = std::fs::canonicalize(&live_config_path).unwrap();
     r2r::log_info!("config path", "{:?}", path_buf);
 
     // Shared atomic ArcSwap
-    let cfg = Arc::new(ArcSwap::from_pointee(load_config(path)));
+    let cfg = Arc::new(ArcSwap::from_pointee(load_config(&live_config_path, &auv_name)));
 
     // Notify channel
     let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(8);
@@ -433,7 +439,7 @@ async fn main() {
     let path_reload = path_buf.clone();
     tokio::spawn(async move {
         while let Some(_) = rx.recv().await {
-            let new_cfg = load_config(path_reload.to_str().unwrap());
+            let new_cfg = load_config(path_reload.to_str().unwrap(), &auv_name);
             r2r::log_info!("", "config change detected {:?}", new_cfg);
 
             println!("NEW CONFIG: {:?}", new_cfg);
@@ -453,17 +459,15 @@ async fn main() {
         let mut last_log = Instant::now();
         while !td.stop.load(Ordering::Relaxed) {
             let current_cfg = cfg.load();
-            let ControllerConfig { kp, ki, kd } = current_cfg.controllers[&controller_name];
+            let PidConfig { kp, ki, kd } = current_cfg.pid[&bridge_name];
+            let tam_x_y_z_roll_pitch_yaw = &current_cfg.tam;
 
             let now = Instant::now();
             let dt = now.duration_since(prev_now).as_secs_f64();
 
             let pose = **td.pose.load();
             let goal = **td.goal.load();
-            let p = pose.pos;
-            let unit = UnitQuaternion::from_quaternion(pose.rot);
-            let (roll, pitch, yaw) = unit.euler_angles();
-            let current_pose = Vector6::new(p.x, p.y, p.z, roll, pitch, yaw);
+            let current_pose = Vector6::<f64>::from(pose);
 
             // r2r::log_info!("goal", "{goal:?}");
             // r2r::log_info!("pose", "{current_pose:?}");
@@ -491,6 +495,7 @@ async fn main() {
                 + ki.component_mul(&sum_err)
                 + kd.component_mul(&vel_err);
 
+            let unit = UnitQuaternion::from_quaternion(pose.rot);
             let mut rotated = unit.conjugate() * wrench.xyz();
             let xy_error = wrench.xy().norm();
 
@@ -507,7 +512,7 @@ async fn main() {
             // r2r::log_info!("wrench", "{wrench:?}");
             // r2r::log_info!("rotated", "{rotated:?}");
 
-            let mut thurstor_values: DVector<f64> = &tam_x_y_z_roll_pitch_yaw * input_x_y_z_roll_pitch_yaw;
+            let mut thurstor_values: DVector<f64> = tam_x_y_z_roll_pitch_yaw * input_x_y_z_roll_pitch_yaw;
 
             // r2r::log_info!("thurstor_values", "{thurstor_values:?}");
 
@@ -529,16 +534,16 @@ async fn main() {
             *avg_curr = (*avg_curr * (count - 1.0) + sum_curr) / count;
             count += 1.0;
             if now.duration_since(last_log) >= log_interval {
-                r2r::log_info!(
-                    "thruster_report",
-                    "Average thruster usage in runtime: {:.2}",
-                    *avg_curr
-                );
-                r2r::log_info!(
-                    "thruster_report",
-                    "Current sum of thrusters: {:.2}",
-                    sum_curr
-                );
+                // r2r::log_info!(
+                //     "thruster_report",
+                //     "Average thruster usage in runtime: {:.2}",
+                //     *avg_curr
+                // );
+                // r2r::log_info!(
+                //     "thruster_report",
+                //     "Current sum of thrusters: {:.2}",
+                //     sum_curr
+                // );
                 last_log = now;
             }
             drop(avg_curr);
@@ -588,7 +593,9 @@ async fn main() {
 
     r2r::log_info!("", "start spinning!");
     while !td.stop.load(Ordering::Relaxed) {
-        node.spin_once(Duration::from_millis(100));
+        let mut node_lock = td.node.lock().unwrap();
+        node_lock.spin_once(Duration::from_millis(100));
+        drop(node_lock);
     }
 
     let avg_current = td.avg_current.lock().await;

@@ -53,7 +53,7 @@ RUN cd vendor/stonefish && \
 # Copy only package.xml files for dependency caching
 COPY src/interfaces/package.xml ./src/interfaces/package.xml
 COPY src/bringup/package.xml ./src/bringup/package.xml
-COPY src/controller_stonefish/package.xml ./src/controller_stonefish/package.xml
+COPY src/bridge_stonefish/package.xml ./src/bridge_stonefish/package.xml
 COPY src/mission_executor/package.xml ./src/mission_executor/package.xml
 COPY vendor/stonefish_ros2/package.xml ./src/stonefish_ros2/package.xml
 
@@ -83,13 +83,13 @@ RUN bash -lc "source /opt/ros/jazzy/setup.bash && \
     colcon build --packages-select mission_executor --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
 COPY src/bringup ./src/bringup
-COPY src/controller_stonefish ./src/controller_stonefish
+COPY src/bridge_stonefish ./src/bridge_stonefish
 COPY vendor/stonefish_ros2 ./src/stonefish_ros2
 
 # build ROS 2 workspace except interfaces and mission_executor
 RUN bash -c "source /opt/ros/jazzy/setup.bash && \
     colcon build \
-    --packages-select stonefish_ros2 controller_stonefish bringup \
+    --packages-select stonefish_ros2 bridge_stonefish bringup \
     --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
 # build mission_executor with actual source code

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(controller_arduino VERSION 0.0.1 LANGUAGES CXX)
+project(bridge_hardware VERSION 0.0.1 LANGUAGES CXX)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
@@ -10,20 +10,25 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(glm REQUIRED)
 
 # Include headers
 include_directories(include)
 
 # Node executable
-add_executable(controller_node src/main.cc)
-ament_target_dependencies(controller_node 
-  rclcpp 
-  std_msgs 
+add_executable(bridge_proteus_node src/bridge_proteus.cc)
+ament_target_dependencies(bridge_proteus_node
+  rclcpp
+  std_msgs
+  nav_msgs
+  sensor_msgs
 )
 
 # Install the executable
 install(TARGETS
-  controller_node
+  bridge_proteus_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

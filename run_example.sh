@@ -29,16 +29,16 @@ WORKSPACE_ROOT="$(pwd)"
 PLUGIN_DIR="$WORKSPACE_ROOT/blender_stonefish_plugin"
 BLEND_FILE="$PLUGIN_DIR/example.blend"
 CONFIG_FILE="$PLUGIN_DIR/config.yaml"
-OUTPUT_SCN="$WORKSPACE_ROOT/src/controller_stonefish/data/scenarios/generated.scn"
+OUTPUT_SCN="$WORKSPACE_ROOT/src/bridge_stonefish/data/scenarios/generated.scn"
 
 echo "Converting example.blend to Stonefish scenario..."
 cd "$PLUGIN_DIR"
 python3 main.py "$BLEND_FILE" -o "$OUTPUT_SCN" -c "$CONFIG_FILE"
 echo ""
 
-echo "Building controller_stonefish package..."
+echo "Building bridge_stonefish package..."
 cd "$WORKSPACE_ROOT"
-colcon build --packages-select controller_stonefish --symlink-install
+colcon build --packages-select bridge_stonefish --symlink-install
 echo ""
 
 echo "Launching Stonefish simulator..."

@@ -2,7 +2,7 @@ import os
 from glob import glob
 from setuptools import find_packages, setup
 
-package_name = 'controller_stonefish'
+package_name = 'bridge_stonefish'
 
 
 def files_under(root_dir):
@@ -43,10 +43,10 @@ setup(
     # tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'thruster_teleop = controller_stonefish.thruster_teleop:main',
-            'imu_thingy = controller_stonefish.imu_thingy:main',
-            'launch_torpedo = controller_stonefish.launch_torpedo:main',
-            'drop_sphere = controller_stonefish.drop_sphere:main',
+            'thruster_teleop = bridge_stonefish.thruster_teleop:main',
+            'imu_thingy = bridge_stonefish.imu_thingy:main',
+            'launch_torpedo = bridge_stonefish.launch_torpedo:main',
+            'drop_sphere = bridge_stonefish.drop_sphere:main',
         ],
     },
 )
