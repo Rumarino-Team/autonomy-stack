@@ -66,6 +66,10 @@ struct MissionExecutor {
 
 const CLOSE_ENOUGH: f64 = 1.0;
 
+fn wrap_angle(angle: f64) -> f64 {
+    (angle + std::f64::consts::PI).rem_euclid(2.0 * std::f64::consts::PI) - std::f64::consts::PI
+}
+
 impl MissionExecutor {
     pub fn new(node: Node) -> Self {
         // hardcoded so it doesn't freak out while it waits for first odometry
@@ -476,15 +480,21 @@ async fn main() {
 
             let rot = UnitQuaternion::from_quaternion(pose.rot);
             let forward = rot * Vector3::y(); // if vehicle’s forward is +Y in body frame
+            let (_, _, current_yaw) = rot.euler_angles();
 
             let dir = Vector3::new(pose_err[0], pose_err[1], 0.0);
-            let dir = if dir.norm() > 1e-6 { dir.normalize() } else { forward };
+            let yaw_error = if dir.norm() > CLOSE_ENOUGH {
+                let dir = dir.normalize();
+                
+                // rotation from current forward → target direction
+                let yaw_quat = UnitQuaternion::rotation_between(&forward, &dir)
+                    .unwrap_or(UnitQuaternion::identity());
 
-            // rotation from current forward → target direction
-            let yaw_quat = UnitQuaternion::rotation_between(&forward, &dir)
-                .unwrap_or(UnitQuaternion::identity());
-
-            let (_, _, yaw_error) = yaw_quat.euler_angles();
+                let (_, _, yaw_error) = yaw_quat.euler_angles();
+                yaw_error
+            } else {
+                wrap_angle(goal[5] - current_yaw)
+            };
 
             pose_err[5] = yaw_error;
 

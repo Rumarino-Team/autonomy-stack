@@ -23,6 +23,9 @@ impl TeleopMission {
     const STEP_X: f64 = 0.1;
     const STEP_Y: f64 = 0.1;
     const STEP_Z: f64 = 0.1;
+    const STEP_ROLL: f64 = 0.1;
+    const STEP_PITCH: f64 = 0.1;
+    const STEP_YAW: f64 = 0.1;
 
     fn print_instructions(&self) {
         println!("\n=== Hydrus Setpoint Teleop (Mission Executor Controller) ===");
@@ -33,6 +36,12 @@ impl TeleopMission {
         println!("  d : Increase x goal by {:.2} m", Self::STEP_X);
         println!("  q : Increase z goal by {:.2} m", Self::STEP_Z);
         println!("  e : Decrease z goal by {:.2} m", Self::STEP_Z);
+        println!("  u : Decrease roll goal by {:.2} rad", Self::STEP_ROLL);
+        println!("  o : Increase roll goal by {:.2} rad", Self::STEP_ROLL);
+        println!("  i : Increase pitch goal by {:.2} rad", Self::STEP_PITCH);
+        println!("  k : Decrease pitch goal by {:.2} rad", Self::STEP_PITCH);
+        println!("  j : Decrease yaw goal by {:.2} rad", Self::STEP_YAW);
+        println!("  l : Increase yaw goal by {:.2} rad", Self::STEP_YAW);
         println!("  x : Hold current pose");
         println!("  z : Quit");
         println!("============================================================\n");
@@ -55,11 +64,20 @@ impl TeleopMission {
             'd' => goal[0] += Self::STEP_X,
             'q' => goal[2] += Self::STEP_Z,
             'e' => goal[2] -= Self::STEP_Z,
+            'u' => goal[3] -= Self::STEP_ROLL,
+            'o' => goal[3] += Self::STEP_ROLL,
+            'i' => goal[4] += Self::STEP_PITCH,
+            'k' => goal[4] -= Self::STEP_PITCH,
+            'j' => goal[5] -= Self::STEP_YAW,
+            'l' => goal[5] += Self::STEP_YAW,
             'x' => {
                 let pos = (**td.pose.load()).pos;
+                let rot = (**td.pose.load()).rot;
+                let (_, _, yaw) = nalgebra::UnitQuaternion::from_quaternion(rot).euler_angles();
                 goal.x = pos.x;
                 goal.y = pos.y;
                 goal.z = pos.z;
+                goal[5] = yaw;
             }
             _ => {}
         }
