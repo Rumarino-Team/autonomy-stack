@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<scenario>
+    <include file="$(find bridge_stonefish)/data/scenarios/pool_env.scn">
+    </include>
+
+    <include file="$(find bridge_stonefish)/data/scenarios/hydrus_auv.scn">
+        <arg name="robot_name" value="hydrus" />
+        <arg name="robot_position" value="1.0 1.0 1.0" />
+        <arg name="robot_rpy" value="0.0 0.0 0.0" />
+    </include>
+</scenario>

@@ -13,7 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
-        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml') + glob('config/*.toml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'oneshot_map_node = bringup.scripts.oneshot_map:main',
+            'imu_pose_covariance_viz = bringup.scripts.imu_pose_covariance_viz:main',
         ],
     },
 )

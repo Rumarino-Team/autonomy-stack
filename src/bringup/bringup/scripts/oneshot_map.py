@@ -26,7 +26,7 @@ class OneshotMap(Node):
         super().__init__("oneshot_map_node")
         map_qos = QoSProfile(depth=1)
         map_qos.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
-        self.pub = self.create_publisher(Map, "/hydrus/map", map_qos)
+        self.pub = self.create_publisher(Map, "/vision/map", map_qos)
 
     def publish_once(self):
         # --- build the map msg ---
