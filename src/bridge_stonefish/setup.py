@@ -3,15 +3,16 @@ from glob import glob
 from setuptools import find_packages, setup
 
 package_name = 'bridge_stonefish'
+package_root = os.path.dirname(__file__)
 
 
 def files_under(root_dir):
     # Yield (install_dir, [file_path]) pairs for every file under root_dir
     pairs = []
-    for path in glob(os.path.join(root_dir, '**', '*'), recursive=True):
+    for path in glob(os.path.join(package_root, root_dir, '**', '*'), recursive=True):
         if os.path.isfile(path):
             # Preserve subfolder structure under share/<pkg>/<root_dir>/...
-            rel_dir = os.path.dirname(os.path.relpath(path, start='.'))
+            rel_dir = os.path.dirname(os.path.relpath(path, start=package_root))
             # rel_dir like "data/maps" or "launch"
             install_dir = os.path.join('share', package_name, rel_dir)
             pairs.append((install_dir, [path]))

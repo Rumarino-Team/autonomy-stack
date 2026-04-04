@@ -183,12 +183,26 @@
 			<ros_publisher topic="/bridge/odometry" />
 		</sensor>
 
-		<sensor name="Camera" rate="10.0" type="camera">
-			<specs resolution_x="800" resolution_y="600" horizontal_fov="60.0" />
-			<origin xyz="0.0 0.3 0.0" rpy="1.5708 0.0 3.14" />
-			<link name="Proteus" />
-			<ros_publisher topic="/bridge/camera" />
-		</sensor>
+		<sensor name="ProteusCameraIMU" rate="200.0" type="imu">
+	<range angular_velocity="20.0 20.0 20.0" linear_acceleration="30.0" />
+	<noise angle="0.00016968 0.00016968 0.00016968"
+			angular_velocity="0.00016968"
+			yaw_drift="0.000019393"
+			linear_acceleration="0.002" />
+	<history samples="1" />
+	<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+	<link name="Proteus" />
+	<ros_publisher topic="/bridge/imu" />
+	</sensor>
+
+
+
+	<sensor name="Camera" rate="21.0" type="camera">
+	<specs resolution_x="800" resolution_y="600" horizontal_fov="60.0" />
+	<origin xyz="0.0 0.3 0.0" rpy="1.5708 0.0 3.14" />
+	<link name="Proteus" />
+	<ros_publisher topic="/bridge/camera" />
+	</sensor>
 
 		<world_transform rpy="$(arg robot_rpy)" xyz="$(arg robot_position)" />
 	</robot>

@@ -1,34 +1,62 @@
 import os
-from launch_ros.substitutions import FindPackageShare
-from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch.conditions import IfCondition, UnlessCondition
+from launch.substitutions import LaunchConfiguration
 
-def generate_launch_description():
-    mission_name_arg = DeclareLaunchArgument('mission_name')
-    auv_name_arg = DeclareLaunchArgument('auv_name')
 
-    env_file_name_arg = DeclareLaunchArgument('env_file_name')
-    auv_file_name_arg = DeclareLaunchArgument('auv_file_name')
-    headless_arg = DeclareLaunchArgument('headless', default_value='false')
+DEFAULT_AUV_FILE_BY_NAME = {
+    'bluerov2': 'bluerov2.scn',
+    'proteus': 'proteus_auv.scn',
+    'hydrus': 'hydrus_auv.scn',
+}
 
-    mission_name = LaunchConfiguration(mission_name_arg.name)
-    auv_name = LaunchConfiguration(auv_name_arg.name)
+POOL_ENV_SCENARIO_BY_AUV = {
+    'bluerov2': 'pool_env_bluerov2.scn',
+    'proteus': 'pool_env_proteus.scn',
+    'hydrus': 'pool_env_hydrus.scn',
+}
 
-    env_file_name = LaunchConfiguration(env_file_name_arg.name)
-    auv_file_name = LaunchConfiguration(auv_file_name_arg.name)
-    headless = LaunchConfiguration(headless_arg.name)
 
-    return LaunchDescription([
-        mission_name_arg,
-        auv_name_arg,
+def _resolve_auv_file_name(auv_name, explicit_auv_file_name):
+    if explicit_auv_file_name:
+        return explicit_auv_file_name
+    return DEFAULT_AUV_FILE_BY_NAME.get(auv_name, f'{auv_name}.scn')
 
-        env_file_name_arg,
-        headless_arg,
 
+def _launch_setup(context, *args, **kwargs):
+    mission_name = LaunchConfiguration('mission_name').perform(context)
+    auv_name = LaunchConfiguration('auv_name').perform(context)
+    env_file_name = LaunchConfiguration('env_file_name').perform(context)
+    explicit_auv_file_name = LaunchConfiguration('auv_file_name').perform(context)
+    headless = LaunchConfiguration('headless').perform(context).lower() in ('true', '1', 'yes')
+
+    bridge_share = get_package_share_directory('bridge_stonefish')
+    stonefish_share = get_package_share_directory('stonefish_ros2')
+
+    resolved_auv_file_name = _resolve_auv_file_name(auv_name, explicit_auv_file_name)
+    auv_file_path = os.path.join(bridge_share, 'data', 'scenarios', resolved_auv_file_name)
+    resolved_env_file_name = env_file_name
+    if env_file_name == 'pool_env.scn':
+        resolved_env_file_name = POOL_ENV_SCENARIO_BY_AUV.get(auv_name, f'pool_env_{auv_name}.scn')
+    scenario_desc_path = os.path.join(bridge_share, 'data', 'scenarios', resolved_env_file_name)
+
+    simulator_launch = 'stonefish_simulator_nogpu.launch.py' if headless else 'stonefish_simulator.launch.py'
+    simulator_arguments = {
+        'simulation_data': os.path.join(bridge_share, 'data'),
+        'scenario_desc': scenario_desc_path,
+        'simulation_rate': '300.0',
+    }
+    if not headless:
+        simulator_arguments.update({
+            'window_res_x': '1920',
+            'window_res_y': '1080',
+            'rendering_quality': 'high',
+        })
+
+    return [
         Node(
             package='mission_executor',
             executable='mission_executor',
@@ -39,57 +67,44 @@ def generate_launch_description():
                 'mission_name': mission_name,
                 'bridge_name': 'stonefish',
                 'auv_name': auv_name,
-                # 'live_config_path': PathJoinSubstitution([FindPackageShare('bringup'), 'config', 'mission_executor.toml']),
                 'live_config_path': os.path.join(
                     os.getcwd(), 'src', 'bringup', 'config', 'mission_executor.toml'
                 ),
             }],
         ),
-
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
-                PathJoinSubstitution(
-                    [FindPackageShare('stonefish_ros2'), 'launch', 'stonefish_simulator.launch.py'])
+                os.path.join(stonefish_share, 'launch', simulator_launch)
             ]),
-            condition=UnlessCondition(headless),  # runs when headless is false
-            launch_arguments={
-                'simulation_data': PathJoinSubstitution(
-                    [FindPackageShare('bridge_stonefish'), 'data']),
-                'scenario_desc': PathJoinSubstitution(
-                    [FindPackageShare('bridge_stonefish'), 'data', 'scenarios', env_file_name]),
-                'simulation_rate': '300.0',
-                'window_res_x': '1920',
-                'window_res_y': '1080',
-                'rendering_quality': 'high'
-            }.items(),
+            launch_arguments=simulator_arguments.items(),
         ),
-
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([
-                PathJoinSubstitution(
-                    [FindPackageShare('stonefish_ros2'), 'launch', 'stonefish_simulator_nogpu.launch.py'])
-            ]),
-            condition=IfCondition(headless),  # true if headless evaluates to "true"/"1"
-            launch_arguments={
-                'simulation_data': PathJoinSubstitution(
-                    [FindPackageShare('bridge_stonefish'), 'data']),
-                'scenario_desc': PathJoinSubstitution(
-                    [FindPackageShare('bridge_stonefish'), 'data', 'scenarios', env_file_name]),
-                'simulation_rate': '300.0',
-            }.items(),
-        ),
-
         Node(
             package='detection_mocker',
             executable='detection_mocker',
             parameters=[{
-                'scn_file_path': PathJoinSubstitution(
-                    [FindPackageShare('bridge_stonefish'), 'data', 'scenarios', env_file_name]),
-                'robot_scn_file_path': PathJoinSubstitution(
-                    [FindPackageShare('bridge_stonefish'), 'data', 'scenarios', auv_file_name]),
+                'scn_file_path': scenario_desc_path,
+                'robot_scn_file_path': auv_file_path,
                 'odometry_topic': '/vision/odometry',
                 'map_output_topic': '/vision/map',
                 'publish_all_objects': True,
             }],
         ),
+    ]
+
+
+def generate_launch_description():
+    mission_name_arg = DeclareLaunchArgument('mission_name')
+    auv_name_arg = DeclareLaunchArgument('auv_name')
+
+    env_file_name_arg = DeclareLaunchArgument('env_file_name')
+    auv_file_name_arg = DeclareLaunchArgument('auv_file_name', default_value='')
+    headless_arg = DeclareLaunchArgument('headless', default_value='false')
+
+    return LaunchDescription([
+        mission_name_arg,
+        auv_name_arg,
+        env_file_name_arg,
+        auv_file_name_arg,
+        headless_arg,
+        OpaqueFunction(function=_launch_setup),
     ])

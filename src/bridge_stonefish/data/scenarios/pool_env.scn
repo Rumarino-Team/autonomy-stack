@@ -207,34 +207,29 @@
 		<world_transform rpy="0.0 0.0 0.0" xyz="1.5 12.0 1.0" />
 	</static>
 
-	<!-- Single Hydrus AUV instance -->
-	<include file="scenarios/hydrus_auv.scn">
-		<arg name="robot_name" value="HydrusAUV" />
-		<arg name="robot_rpy" value="0.0 0.0 0.0" />
-		<arg name="robot_position" value="1.0 1.0 1.0" />
-	</include>
+	<!-- AUV is injected at launch time by bringup/launch/stonefish.launch.py -->
 
-	<include file="scenarios/torpedo.scn">
+	<!-- <include file="scenarios/torpedo.scn">
 		<arg name="robot_name" value="Torpedo" />
 		<arg name="robot_rpy" value="0.0 0.0 0.0" />
 		<arg name="robot_position" value="1.0 1.2 0.75" />
-	</include>
+	</include> -->
 
-	<include file="scenarios/sphere.scn">
+	<!-- <include file="scenarios/sphere.scn">
 		<arg name="robot_name" value="Sphere" />
 		<arg name="robot_rpy" value="0.0 0.0 0.0" />
 		<arg name="robot_position" value="1.0 1.2 1.25" />
-	</include>
+	</include> -->
 
-	<glue name="TorpedoAttach" activated="true">
+	<!-- <glue name="TorpedoAttach" activated="true">
 		<first_body name="HydrusAUV/Hydrus" />
 		<second_body name="Torpedo/TorpedoLink" />
 		<ros_service topic="/torpedo/attach" />
-	</glue>
+	</glue> -->
 
-	<glue name="Dropper" activated="true">
+	<!-- <glue name="Dropper" activated="true">
 		<first_body name="HydrusAUV/Hydrus" />
 		<second_body name="Sphere/SphereLink" />
 		<ros_service topic="/dropper/drop" />
-	</glue>
+	</glue> -->
 </scenario>

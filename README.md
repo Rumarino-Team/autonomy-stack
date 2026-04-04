@@ -144,12 +144,17 @@ source install/setup.bash
 
 ## Simulate Missions using bridge_stonefish
 ```sh
+# Note:
+# - `auv_name` is now the single source of truth for AUV selection.
+# - For `env_file_name:=pool_env.scn`, the launch script auto-selects the
+#   matching pool scenario wrapper for the chosen AUV.
+# - `auv_file_name` is optional and only needed as a manual override.
+
 # proteus, prequalify mission
 ros2 launch bringup stonefish.launch.py \
     mission_name:=prequalify \
     auv_name:=proteus \
     env_file_name:=proteus_env.scn \
-    auv_file_name:=proteus_auv.scn \
     headless:=false
 
 # hydrus, prequalify mission
@@ -157,7 +162,6 @@ ros2 launch bringup stonefish.launch.py \
     mission_name:=prequalify \
     auv_name:=hydrus \
     env_file_name:=hydrus_env.scn \
-    auv_file_name:=hydrus_auv.scn \
     headless:=false
 
 # proteus, teleop mission
@@ -168,8 +172,22 @@ ros2 launch bringup stonefish.launch.py \
     mission_name:=teleop \
     auv_name:=proteus \
     env_file_name:=proteus_env.scn \
-    auv_file_name:=proteus_auv.scn \
     headless:=false
+
+# bluerov2, teleop mission
+ros2 launch bringup stonefish.launch.py \
+  mission_name:=teleop \
+  auv_name:=bluerov2 \
+  env_file_name:=pool_env.scn \
+  headless:=false
+
+# optional manual override (advanced)
+ros2 launch bringup stonefish.launch.py \
+  mission_name:=teleop \
+  auv_name:=bluerov2 \
+  env_file_name:=pool_env.scn \
+  auv_file_name:=bluerov2.scn \
+  headless:=false
 ```
 
 ## Test using bridge_stonefish
