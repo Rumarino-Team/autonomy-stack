@@ -57,7 +57,13 @@ def _launch_setup(context, *args, **kwargs):
             'rendering_quality': 'high',
         })
 
-    terminal = os.environ['TERMINAL']
+    if 'TERM' in os.environ.keys():
+        terminal = os.environ['TERM']
+    elif 'TERMINAL' in os.environ.keys():
+        terminal = os.environ['TERMINAL']
+    else:
+        print("Default terminal not found, using xterm...")
+        terminal = "xterm"
     terminal += ' -e'
     ret = [
         IncludeLaunchDescription(
