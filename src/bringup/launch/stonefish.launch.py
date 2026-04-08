@@ -32,6 +32,7 @@ def _launch_setup(context, *args, **kwargs):
     env_file_name = LaunchConfiguration('env_file_name').perform(context)
     explicit_auv_file_name = LaunchConfiguration('auv_file_name').perform(context)
     headless = LaunchConfiguration('headless').perform(context).lower() in ('true', '1', 'yes')
+    stonefish_only = LaunchConfiguration('stonefish_only', default="no").perform(context).lower() in ('true', '1', 'yes')
 
     bridge_share = get_package_share_directory('bridge_stonefish')
     stonefish_share = get_package_share_directory('stonefish_ros2')
@@ -56,22 +57,9 @@ def _launch_setup(context, *args, **kwargs):
             'rendering_quality': 'high',
         })
 
-    return [
-        Node(
-            package='mission_executor',
-            executable='mission_executor',
-            emulate_tty=True,
-            output='screen',
-            prefix='xterm -e',
-            parameters=[{
-                'mission_name': mission_name,
-                'bridge_name': 'stonefish',
-                'auv_name': auv_name,
-                'live_config_path': os.path.join(
-                    os.getcwd(), 'src', 'bringup', 'config', 'mission_executor.toml'
-                ),
-            }],
-        ),
+    terminal = os.environ['TERMINAL']
+    terminal += ' -e'
+    ret = [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 os.path.join(stonefish_share, 'launch', simulator_launch)
@@ -90,6 +78,25 @@ def _launch_setup(context, *args, **kwargs):
             }],
         ),
     ]
+    if not stonefish_only:
+        ret += [
+            Node(
+                package='mission_executor',
+                executable='mission_executor',
+                emulate_tty=True,
+                output='screen',
+                prefix=terminal,
+                parameters=[{
+                    'mission_name': mission_name,
+                    'bridge_name': 'stonefish',
+                    'auv_name': auv_name,
+                    'live_config_path': os.path.join(
+                        os.getcwd(), 'src', 'bringup', 'config', 'mission_executor.toml'
+                    ),
+                }],
+            ),
+        ]
+    return ret
 
 
 def generate_launch_description():

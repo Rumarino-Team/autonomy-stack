@@ -165,9 +165,6 @@ ros2 launch bringup stonefish.launch.py \
     headless:=false
 
 # proteus, teleop mission
-# if you don't have xterm
-# sudo apt install xterm
-# sudo dnf install xterm
 ros2 launch bringup stonefish.launch.py \
     mission_name:=teleop \
     auv_name:=proteus \
