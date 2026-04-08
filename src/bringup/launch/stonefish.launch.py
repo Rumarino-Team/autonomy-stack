@@ -34,6 +34,7 @@ def _launch_setup(context, *args, **kwargs):
     headless = LaunchConfiguration('headless').perform(context).lower() in ('true', '1', 'yes')
     stonefish_only = LaunchConfiguration('stonefish_only', default="no").perform(context).lower() in ('true', '1', 'yes')
 
+    cwd = os.getcwd()
     bridge_share = get_package_share_directory('bridge_stonefish')
     stonefish_share = get_package_share_directory('stonefish_ros2')
 
@@ -57,12 +58,29 @@ def _launch_setup(context, *args, **kwargs):
             'rendering_quality': 'high',
         })
 
-    if 'TERMINAL' in os.environ.keys():
-        terminal = os.environ['TERMINAL']
+    # Setup ROS2 workspace based on current working directory
+    ros_setup = os.path.join(cwd, 'install', 'setup.bash')
+
+    # TMUX split
+    if 'TMUX' in os.environ:
+        terminal_prefix = (
+            'tmux split-window -v -- bash -c '
+            f'"source {ros_setup} && ros2 run mission_executor mission_executor '
+            f'--ros-args -p mission_name:={mission_name} '
+            f'-p bridge_name:=stonefish '
+            f'-p auv_name:={auv_name} '
+            f'-p live_config_path:={os.path.join(cwd, "src/bringup/config/mission_executor.toml")}"'
+        )
     else:
-        print("Default terminal not found, using xterm...If this errors out please install it")
-        terminal = "xterm"
-    terminal += ' -e'
+        term = os.environ.get('TERMINAL', 'xterm')
+        terminal_prefix = (
+            f'{term} -e bash -c "source {ros_setup} && ros2 run mission_executor mission_executor '
+            f'--ros-args -p mission_name:={mission_name} '
+            f'-p bridge_name:=stonefish '
+            f'-p auv_name:={auv_name} '
+            f'-p live_config_path:={os.path.join(cwd, "src/bringup/config/mission_executor.toml")}"'
+        )
+
     ret = [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
@@ -89,14 +107,12 @@ def _launch_setup(context, *args, **kwargs):
                 executable='mission_executor',
                 emulate_tty=True,
                 output='screen',
-                prefix=terminal,
+                prefix=terminal_prefix,
                 parameters=[{
                     'mission_name': mission_name,
                     'bridge_name': 'stonefish',
                     'auv_name': auv_name,
-                    'live_config_path': os.path.join(
-                        os.getcwd(), 'src', 'bringup', 'config', 'mission_executor.toml'
-                    ),
+                    'live_config_path': os.path.join(cwd, 'src', 'bringup', 'config', 'mission_executor.toml'),
                 }],
             ),
         ]
