@@ -19,7 +19,7 @@ impl PrecualifyMission {
         Self {}
     }
 
-    fn go_around(&self, td: &MissionExecutor, idx: usize) {
+    async fn go_around(&self, td: &MissionExecutor, idx: usize) {
         let object = MapObject::from(&td.map.load().objects[idx]);
         let object_pos = object.bbox.center.pos;
         let object_rot = object.bbox.center.rot;
@@ -59,12 +59,13 @@ impl PrecualifyMission {
         }
 
         for i in 0..corner_pluss.len() {
-            td.move_to(corner_pluss[(starting_i + i) % corner_pluss.len()]);
+            td.move_to(corner_pluss[(starting_i + i) % corner_pluss.len()])
+                .await;
         }
-        td.move_to(initial_sub_pos);
+        td.move_to(initial_sub_pos).await;
     }
 
-    fn go_through(&self, td: &MissionExecutor, idx: usize) {
+    async fn go_through(&self, td: &MissionExecutor, idx: usize) {
         let sub_pose = td.pose.load();
         let map = td.map.load();
         let object = MapObject::from(&map.objects[idx]);
@@ -87,16 +88,17 @@ impl PrecualifyMission {
 
         let point_list: Vec<Point3<f64>> = vec![before.into(), overshoot.into()];
 
-        td.move_to_points(point_list);
+        td.move_to_points(point_list).await;
     }
 }
 
+#[async_trait::async_trait]
 impl Mission for PrecualifyMission {
-    fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
+    async fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
         let object = MapObject::from(&td.map.load().objects[idx]);
         match object.cls {
-            ObjectCls::Rectangle | ObjectCls::Cube => self.go_around(td, idx),
-            ObjectCls::Gate => self.go_through(td, idx),
+            ObjectCls::Rectangle | ObjectCls::Cube => self.go_around(td, idx).await,
+            ObjectCls::Gate => self.go_through(td, idx).await,
             ObjectCls::Shark => (),
             ObjectCls::Other => (),
             ObjectCls::SwordFish => (),
@@ -133,8 +135,9 @@ pub(crate) struct DropIntoBoxMission {
     box_idx: usize,
 }
 
+#[async_trait::async_trait]
 impl Mission for DropIntoBoxMission {
-    fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
+    async fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
         let object = MapObject::from(&td.map.load().objects[idx]);
         add_flags!(self.seen, object.cls);
         match self.step {
@@ -214,8 +217,9 @@ impl DropIntoBoxMission {
 
 pub(crate) struct CardinalDirections {}
 
+#[async_trait::async_trait]
 impl Mission for CardinalDirections {
-    fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
+    async fn react_to_object(&mut self, td: &MissionExecutor, idx: usize) {
         let sub = **td.pose.load();
         let sub_vec = Vector6::new(
             sub.pos[0], sub.pos[1], sub.pos[2], 

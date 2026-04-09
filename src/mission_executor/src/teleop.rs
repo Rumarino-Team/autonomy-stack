@@ -8,8 +8,9 @@ use crate::{Mission, MissionExecutor};
 
 pub(crate) struct TeleopMission {}
 
+#[async_trait::async_trait]
 impl Mission for TeleopMission {
-    fn react_to_object(&mut self, td: &MissionExecutor, _idx: usize) {
+    async fn react_to_object(&mut self, td: &MissionExecutor, _idx: usize) {
         self.print_instructions();
         self.input_listener_blocking(td);
     }

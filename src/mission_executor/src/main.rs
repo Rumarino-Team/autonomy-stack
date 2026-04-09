@@ -97,7 +97,7 @@ impl MissionExecutor {
 
     // maybe this should be done relative to an object
     /// blocks until `dest` is reached within `CLOSE_ENOUGH` distance
-    pub fn move_to(&self, dest: Vector3<f64>) {
+    pub async fn move_to(&self, dest: Vector3<f64>) {
         let mut old_goal = **self.goal.load();
         old_goal.x = dest.x;
         old_goal.y = dest.y;
@@ -111,12 +111,12 @@ impl MissionExecutor {
             if dist < CLOSE_ENOUGH {
                 break;
             } else {
-                std::thread::sleep(Duration::from_millis(100));
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
         }
     }
 
-    pub fn move_to_points(&self, mut dest: Vec<Point3<f64>>) {
+    pub async fn move_to_points(&self, mut dest: Vec<Point3<f64>>) {
         let sub_pose = self.pose.load();
         let map = self.map.load();
         let object_list = &map.objects;
@@ -159,7 +159,7 @@ impl MissionExecutor {
         r2r::log_info!("point_list", "{dest:#?}");
 
         for point in dest {
-            self.move_to(point.coords);
+            self.move_to(point.coords).await;
             std::thread::sleep(Duration::from_millis(500));
         }
     }
@@ -208,8 +208,9 @@ impl From<&r2r::interfaces::msg::MapObject> for MapObject {
     }
 }
 
+#[async_trait::async_trait]
 trait Mission: Send + Sync {
-    fn react_to_object(&mut self, td: &MissionExecutor, idx: usize);
+    async fn react_to_object(&mut self, td: &MissionExecutor, idx: usize);
 }
 
 #[derive(Debug, Clone)]
@@ -586,7 +587,7 @@ async fn main() {
                 }
                 while reacted < objects_len {
                     r2r::log_info!("reacting...", "{reacted}");
-                    mission.react_to_object(&td, reacted);
+                    mission.react_to_object(&td, reacted).await;
                     r2r::log_info!("reacted", "{reacted}");
                     reacted += 1;
                 }
