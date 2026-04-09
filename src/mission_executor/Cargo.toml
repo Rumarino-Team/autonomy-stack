@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 arc-swap = "1.7.1"
+async-trait = "0.1.89"
 ctrlc = "3.5.1"
 futures = "0.3.31"
 nalgebra = "0.34.1"
