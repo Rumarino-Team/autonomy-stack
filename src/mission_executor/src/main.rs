@@ -65,6 +65,8 @@ struct MissionExecutor {
 }
 
 const CLOSE_ENOUGH: f64 = 1.0;
+const THRUSTER_USAGE: f64 = 7000.0; //in milliamps
+const BATTERY_CAPACITY: f64 = 10000.0; //in mAh
 
 fn wrap_angle(angle: f64) -> f64 {
     (angle + std::f64::consts::PI).rem_euclid(2.0 * std::f64::consts::PI) - std::f64::consts::PI
@@ -527,10 +529,10 @@ async fn main() {
 
             // r2r::log_info!("thurstor_values", "{thurstor_values:?}");
 
-            let minn = DVector::repeat(thurstor_values.len(), -THRUSTOR_SATURATE);
-            let maxx = DVector::repeat(thurstor_values.len(), THRUSTOR_SATURATE);
-            thurstor_values = thurstor_values.simd_clamp(minn, maxx) / THRUSTOR_SATURATE;
-
+            for val in &mut thurstor_values {
+                *val = val.clamp(-5.0, 5.0);
+                 *val /= 5.0;
+            }
             let mut thrusters_msg = Float64MultiArray::default();
             thrusters_msg.data.extend(thurstor_values.iter());
             thrusters_pub
@@ -539,22 +541,27 @@ async fn main() {
 
             let mut sum_curr = 0.0;
             for val in &thurstor_values {
-                sum_curr += val.abs();
+                sum_curr += val.powf(2.0) * THRUSTER_USAGE;
             }
             let mut avg_curr = td.avg_current.lock().await;
             *avg_curr = (*avg_curr * (count - 1.0) + sum_curr) / count;
             count += 1.0;
             if now.duration_since(last_log) >= log_interval {
-                // r2r::log_info!(
-                //     "thruster_report",
-                //     "Average thruster usage in runtime: {:.2}",
-                //     *avg_curr
-                // );
-                // r2r::log_info!(
-                //     "thruster_report",
-                //     "Current sum of thrusters: {:.2}",
-                //     sum_curr
-                // );
+                 r2r::log_info!(
+                     "thruster_report",
+                     "Average thruster usage in runtime: {:.2}",
+                     *avg_curr
+                 );
+                 r2r::log_info!(
+                     "thruster_report",
+                     "Current sum of thrusters: {:.2}",
+                     sum_curr
+                );
+                r2r::log_info!(
+                    "thruster_report",
+                    "Estimated battery life remaining: {:.2}",
+                    BATTERY_CAPACITY / *avg_curr
+                );
                 last_log = now;
             }
             drop(avg_curr);
