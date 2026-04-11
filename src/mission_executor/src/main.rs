@@ -66,7 +66,7 @@ struct MissionExecutor {
 
 const CLOSE_ENOUGH: f64 = 1.0;
 const THRUSTER_USAGE: f64 = 7000.0; //in milliamps
-const BATTERY_CAPACITY: f64 = 10000.0; //in mAh
+const BATTERY_CAPACITY: f64 = 5000.0; //in mAh
 
 fn wrap_angle(angle: f64) -> f64 {
     (angle + std::f64::consts::PI).rem_euclid(2.0 * std::f64::consts::PI) - std::f64::consts::PI
