@@ -3,4 +3,4 @@ linker = "clang"
 rustflags = [ "-C", "link-arg=-fuse-ld=ld" ]
 
 [env]
-IDL_PACKAGE_FILTER = { value = "std_msgs;geometry_msgs;nav_msgs;vision_msgs;interfaces;sensor_msgs" }
+IDL_PACKAGE_FILTER = { value = "std_msgs;geometry_msgs;nav_msgs;vision_msgs;interfaces" }

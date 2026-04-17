@@ -13,6 +13,6 @@
 [submodule "vendor/joystick_drivers"]
 	path = vendor/joystick_drivers
 	url = https://github.com/ros-drivers/joystick_drivers.git
-[submodule "vendor/zed-ros2-examples.git"]
-	path = vendor/zed-ros2-examples.git
-	url = https://github.com/stereolabs/zed-ros2-examples.git
+[submodule "vendor/zed-ros2-examples"]
+	path = vendor/zed-ros2-examples
+	url = git@github.com:stereolabs/zed-ros2-examples.git

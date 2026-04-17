@@ -96,10 +96,6 @@ def _launch_setup(context, *args, **kwargs):
                 'publish_all_objects': True,
             }],
         ),
-        Node(
-            package='joy',
-            executable='joy_node',
-        ),
     ]
     if not stonefish_only:
         ret += [
