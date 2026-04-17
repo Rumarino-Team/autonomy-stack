@@ -12,7 +12,7 @@
 	url = https://github.com/DepthAnything/Depth-Anything-V2.git
 [submodule "vendor/joystick_drivers"]
 	path = vendor/joystick_drivers
-	url = git@github.com:ros-drivers/joystick_drivers.git
+	url = https://github.com/ros-drivers/joystick_drivers.git
 [submodule "vendor/zed-ros2-examples.git"]
 	path = vendor/zed-ros2-examples.git
-	url = git@github.com:stereolabs/zed-ros2-examples.git
+	url = https://github.com/stereolabs/zed-ros2-examples.git
