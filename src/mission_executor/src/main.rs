@@ -14,7 +14,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use arc_swap::ArcSwap;
 use parry3d_f64::shape::Segment;
-use notify::Watcher;
 use tokio::sync::{Mutex, Notify};
 use futures::StreamExt;
 use nalgebra::{DVector, Isometry3, MatrixXx6, Point3, Quaternion, UnitQuaternion, Vector3, Vector6};
