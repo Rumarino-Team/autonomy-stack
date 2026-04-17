@@ -136,7 +136,7 @@ source /opt/ros/jazzy/setup.bash
 
 # Build packages
 colcon build \
-    --packages-select interfaces bringup mission_executor bridge_stonefish Stonefish stonefish_ros2 detection_mocker
+    --packages-select interfaces bringup mission_executor bridge_stonefish Stonefish stonefish_ros2 detection_mocker joy sdl2_vendor
 
 # Source the workspace
 source install/setup.bash
