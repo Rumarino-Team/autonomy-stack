@@ -1,0 +1,263 @@
+%YAML:1.0
+
+#--------------------------------------------------------------------------------------------
+# ORB-SLAM3 Complete Configuration Template
+# All available parameters with descriptions and typical values
+#--------------------------------------------------------------------------------------------
+
+#--------------------------------------------------------------------------------------------
+# Camera Parameters
+#--------------------------------------------------------------------------------------------
+
+# Camera model type
+# Options: "PinHole" or "KannalaBrandt8" (fisheye)
+Camera.type: "PinHole"
+
+# Camera resolution
+Camera.width: 640
+Camera.height: 480
+
+# Camera intrinsics (focal length and principal point)
+# For PinHole camera model
+Camera.fx: 500.0       # Focal length in x direction (pixels)
+Camera.fy: 500.0       # Focal length in y direction (pixels)
+Camera.cx: 320.0       # Principal point x coordinate (pixels)
+Camera.cy: 240.0       # Principal point y coordinate (pixels)
+
+# Distortion coefficients for PinHole model
+# [k1, k2, p1, p2, k3] - radial (k) and tangential (p) distortion
+Camera.k1: 0.0         # Radial distortion coefficient k1
+Camera.k2: 0.0         # Radial distortion coefficient k2
+Camera.p1: 0.0         # Tangential distortion coefficient p1
+Camera.p2: 0.0         # Tangential distortion coefficient p2
+Camera.k3: 0.0         # Radial distortion coefficient k3 (optional)
+
+# For KannalaBrandt8 (fisheye) model
+# Camera.k1: 0.0       # Fisheye distortion k1
+# Camera.k2: 0.0       # Fisheye distortion k2
+# Camera.k3: 0.0       # Fisheye distortion k3
+# Camera.k4: 0.0       # Fisheye distortion k4
+
+# Overlapping area for fisheye cameras (optional)
+# Camera1.overlappingBegin: 0
+# Camera1.overlappingEnd: 640
+
+# Camera frame rate (Hz)
+Camera.fps: 30.0
+
+# Color order: 1 = RGB, 0 = BGR
+Camera.RGB: 1
+
+# Image resize (optional - for processing at different resolution)
+# Camera.newHeight: 480
+# Camera.newWidth: 640
+
+#--------------------------------------------------------------------------------------------
+# Stereo Camera Parameters (for stereo/multi-camera systems)
+#--------------------------------------------------------------------------------------------
+
+# Second camera intrinsics (if using stereo)
+# Camera2.fx: 500.0
+# Camera2.fy: 500.0
+# Camera2.cx: 320.0
+# Camera2.cy: 240.0
+# Camera2.k1: 0.0
+# Camera2.k2: 0.0
+# Camera2.p1: 0.0
+# Camera2.p2: 0.0
+# Camera2.k3: 0.0
+
+# Stereo baseline * fx (for stereo systems)
+# Camera.bf: 40.0
+# Or use baseline directly
+# Stereo.b: 0.08        # Baseline in meters
+
+# Transformation from camera 1 to camera 2 (T_c1_c2)
+# 4x4 transformation matrix
+# Stereo.T_c1_c2: !!opencv-matrix
+#    rows: 4
+#    cols: 4
+#    dt: f
+#    data: [1.0, 0.0, 0.0, 0.08,
+#           0.0, 1.0, 0.0, 0.0,
+#           0.0, 0.0, 1.0, 0.0,
+#           0.0, 0.0, 0.0, 1.0]
+
+# Depth threshold for stereo (baseline * threshold)
+# Stereo.ThDepth: 40.0
+
+#--------------------------------------------------------------------------------------------
+# RGB-D Parameters (for depth cameras)
+#--------------------------------------------------------------------------------------------
+
+# Depth map factor (converts depth values to meters)
+# For TUM datasets: 5000.0
+# For real depth cameras: usually 1000.0 (if depth is in mm)
+# For DepthAnything normalized output: 1.0
+Camera.bf: 0.0                    # Set to 0 for monocular (required even if not used)
+ThDepth: 40.0                     # Depth threshold (required even if not used)
+DepthMapFactor: 1.0               # Scale factor for depth values
+RGBD.DepthMapFactor: 1.0          # Alternative depth map factor parameter
+
+#--------------------------------------------------------------------------------------------
+# IMU Parameters (for visual-inertial systems)
+#--------------------------------------------------------------------------------------------
+
+# IMU noise characteristics (from Allan variance analysis)
+# These values are critical for accurate IMU integration
+
+# Gyroscope noise density (rad/s/sqrt(Hz))
+# Typical values: 1e-4 to 1e-3 for consumer IMUs, 1e-5 for high-end
+IMU.NoiseGyro: 1.7e-4
+
+# Accelerometer noise density (m/s^2/sqrt(Hz))
+# Typical values: 1e-3 to 1e-2 for consumer IMUs, 1e-4 for high-end
+IMU.NoiseAcc: 2.0e-3
+
+# Gyroscope random walk (rad/s^2/sqrt(Hz))
+# Describes bias drift over time
+# Typical values: 1e-6 to 1e-4
+IMU.GyroWalk: 1.9e-5
+
+# Accelerometer random walk (m/s^3/sqrt(Hz))
+# Describes bias drift over time
+# Typical values: 1e-4 to 1e-2
+IMU.AccWalk: 3.0e-3
+
+# IMU sampling frequency (Hz)
+# Must match your IMU data rate
+IMU.Frequency: 200
+
+# Transformation from body (IMU) frame to camera frame (T_b_c1)
+# This is the extrinsic calibration between IMU and camera
+# Should be calibrated using tools like Kalibr
+# Default: Identity matrix (assumes IMU and camera are aligned)
+IMU.T_b_c1: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [1.0, 0.0, 0.0, 0.0,
+          0.0, 1.0, 0.0, 0.0,
+          0.0, 0.0, 1.0, 0.0,
+          0.0, 0.0, 0.0, 1.0]
+
+# Insert keyframes when tracking is lost (IMU-inertial mode)
+# 1 = true, 0 = false
+IMU.InsertKFsWhenLost: 1
+
+#--------------------------------------------------------------------------------------------
+# ORB Feature Extractor Parameters
+#--------------------------------------------------------------------------------------------
+
+# Number of ORB features per frame
+# More features = better tracking but slower
+# Typical values: 1000-2000 for monocular, 1000-3000 for stereo/RGB-D
+ORBextractor.nFeatures: 1000
+
+# Scale factor between pyramid levels
+# Typical value: 1.2
+# Higher values = fewer levels needed but larger jumps in scale
+ORBextractor.scaleFactor: 1.2
+
+# Number of pyramid levels
+# More levels = better scale invariance but slower
+# Typical values: 8
+ORBextractor.nLevels: 8
+
+# FAST detector threshold
+# Initial threshold for FAST corner detection
+# If not enough features found, threshold is reduced to minThFAST
+ORBextractor.iniThFAST: 20
+
+# Minimum FAST threshold
+# Fallback threshold if iniThFAST doesn't find enough corners
+ORBextractor.minThFAST: 7
+
+#--------------------------------------------------------------------------------------------
+# Viewer Parameters (for ORB-SLAM3 visualization window)
+#--------------------------------------------------------------------------------------------
+
+# Keyframe visualization size
+Viewer.KeyFrameSize: 0.05
+
+# Keyframe line width (in visualization)
+Viewer.KeyFrameLineWidth: 1.0
+
+# Graph line width (covisibility graph)
+Viewer.GraphLineWidth: 0.9
+
+# Point size (map points)
+Viewer.PointSize: 2.0
+
+# Camera size (in visualization)
+Viewer.CameraSize: 0.08
+
+# Camera line width
+Viewer.CameraLineWidth: 3.0
+
+# Initial viewpoint position
+Viewer.ViewpointX: 0.0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+
+# Viewpoint focal length (controls zoom)
+Viewer.ViewpointF: 500.0
+
+# Image viewer scale (optional, for resizing displayed images)
+# Viewer.imageViewScale: 1.0
+
+#--------------------------------------------------------------------------------------------
+# System Parameters
+#--------------------------------------------------------------------------------------------
+
+# Load existing map from file (optional)
+# Provide path to .osa file to continue from previous session
+# Leave as 0 to start fresh
+System.LoadAtlasFromFile: 0
+
+# Save map to file on shutdown (optional)
+# Provide filename to save map, or 0 to not save
+System.SaveAtlasToFile: 0
+
+# Threshold for far points (optional)
+# Points beyond this distance are considered outliers
+# System.thFarPoints: 100.0
+
+#--------------------------------------------------------------------------------------------
+# Advanced Parameters (usually not needed)
+#--------------------------------------------------------------------------------------------
+
+# Sequence name (for multi-session mapping)
+# Seq.Name: "sequence_01"
+
+# Use loop closure (typically always enabled)
+# System.loopClosureEnabled: 1
+
+# Use local mapping (typically always enabled)
+# System.localMappingEnabled: 1
+
+#--------------------------------------------------------------------------------------------
+# Notes and Calibration Tips
+#--------------------------------------------------------------------------------------------
+
+# Camera Calibration:
+# - Use tools like: ROS camera_calibration, OpenCV calibration, or MATLAB
+# - Record checkerboard video, extract intrinsics and distortion
+# - Accurate calibration is CRITICAL for good SLAM performance
+#
+# IMU Calibration:
+# - Use Allan variance analysis for noise parameters
+# - Use Kalibr for IMU-camera extrinsic calibration (T_b_c1)
+# - Record static IMU data for several hours for Allan variance
+#
+# Parameter Tuning:
+# - Start with these defaults
+# - Adjust ORBextractor.nFeatures based on scene texture
+# - Adjust IMU noise if you see drift or instability
+# - Adjust FAST thresholds if tracking is lost frequently
+#
+# Debugging:
+# - Enable viewer to see tracking status
+# - Check that camera frame rate matches Camera.fps
+# - Verify Camera.RGB matches your image encoding
+# - Ensure depth factor is correct for your depth camera
