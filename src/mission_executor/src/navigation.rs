@@ -195,8 +195,8 @@ mod tests {
     #[test]
     fn simple_collision() {
         let sub_pos = Matrix3x1::zeros();
-        let target_pos = Matrix3x1::new(5.0, 5.0, 5.0);
-        let cuboid_pos = Matrix3x1::new(2.0, 2.0, 2.0);
+        let target_pos = Matrix3x1::new(6.0, 6.0, 6.0);
+        let cuboid_pos = Matrix3x1::new(3.0, 3.0, 3.0);
         let cuboid_size = Matrix3x1::new(1.0, 1.0, 1.0);
         let rot = Quaternion::identity();
 
@@ -205,7 +205,25 @@ mod tests {
 
         let new_point = get_new_point(&bbox, &cuboid_pos, segment, &map_bounds)
             .expect("Collision didn't happen");
-        let point = Point3::new(2.25, 7.0, 2.0);
+        let point = Point3::new(0.0, 2.5, 0.0);
+        assert_eq!(point, new_point);
+
+        assert!(!collides(segment.a, bbox, cuboid_pos, new_point))
+    }
+
+    fn barely_colliding() {
+        let sub_pos = Matrix3x1::zeros();
+        let target_pos = Matrix3x1::new(5.0, 5.0, 5.0);
+        let cuboid_pos = Matrix3x1::new(1.0, 1.0, 1.0);
+        let cuboid_size = Matrix3x1::new(1.0, 1.0, 1.0);
+        let rot = Quaternion::identity();
+
+        let (bbox, cuboid_pos, segment, map_bounds) = 
+            setup(sub_pos, target_pos, cuboid_pos, cuboid_size, rot);
+
+        let new_point = get_new_point(&bbox, &cuboid_pos, segment, &map_bounds)
+            .expect("Collision didn't happen");
+        let point = Point3::new(0.0, 2.5, 0.0);
         assert_eq!(point, new_point);
 
         assert!(!collides(segment.a, bbox, cuboid_pos, new_point))
