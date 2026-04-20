@@ -14,6 +14,9 @@ def generate_launch_description():
     use_viewer = LaunchConfiguration("use_viewer")
     use_imu = LaunchConfiguration("use_imu")
     use_depth = LaunchConfiguration("use_depth")
+    image_topic = LaunchConfiguration("image_topic")
+    depth_topic = LaunchConfiguration("depth_topic")
+    imu_topic = LaunchConfiguration("imu_topic")
     
     # Load ORB-SLAM3 settings
     settings_file = os.path.join(orb_slam_share, "config", "stonefish_hydrus.yaml")
@@ -36,6 +39,21 @@ def generate_launch_description():
             default_value="true",
             description="Enable RGB-D SLAM mode"
         ),
+        DeclareLaunchArgument(
+            "image_topic",
+            default_value="/hydrus/rgb_camera/image_raw",
+            description="Image topic consumed by ORB-SLAM3"
+        ),
+        DeclareLaunchArgument(
+            "depth_topic",
+            default_value="/hydrus/depth_camera/image_raw",
+            description="Depth topic consumed by ORB-SLAM3"
+        ),
+        DeclareLaunchArgument(
+            "imu_topic",
+            default_value="/hydrus/imu",
+            description="IMU topic consumed by ORB-SLAM3"
+        ),
         
         # ORB-SLAM3 Node
         Node(
@@ -50,10 +68,9 @@ def generate_launch_description():
                     "use_viewer": use_viewer,
                     "use_imu": use_imu,
                     "use_depth": use_depth,
-                    # Stonefish Hydrus simulation topics
-                    "image_topic": "/hydrus/rgb_camera/image_raw",
-                    "depth_topic": "/hydrus/depth_camera/image_raw",
-                    "imu_topic": "/hydrus/imu",
+                    "image_topic": image_topic,
+                    "depth_topic": depth_topic,
+                    "imu_topic": imu_topic,
                     # Output topics
                     "pose_topic": "orb_slam3/camera_pose",
                     "odom_topic": "orb_slam3/camera_odom",

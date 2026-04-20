@@ -201,8 +201,9 @@ ros2 launch bringup stonefish.launch.py \
 source /opt/ros/jazzy/setup.bash
 
 # Build packages (TODO: remember about detections stuff)
+# VectorNav is vendored as a submodule under vendor/vectornav on the ros2 branch.
 colcon build \
-    --packages-select interfaces bringup mission_executor bridge_hardware \
+  --packages-select interfaces bringup mission_executor bridge_hardware vectornav vectornav_msgs \
     --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Optional: disable VN-100 support at compile time
@@ -216,12 +217,17 @@ colcon build \
   --packages-select bridge_hardware \
   --cmake-args -DBRIDGE_HARDWARE_ENABLE_VN100=ON
 
+# When using hardware_proteus.launch.py, build bridge_hardware with VN-100 off
+# because the IMU is started by the vectornav package launch file.
+
 # Source the workspace
 source install/setup.bash
 
 # Run
 ros2 launch bringup hardware_proteus.launch.py \
     mission_name:=prequalify \
-    arduino_port:=/dev/ttyACM0 arduino_baud_rate:=115200 \
-    vn100_port:=/dev/ttyUSB0 vn100_baud_rate:=115200
+    arduino_port:=/dev/ttyACM0 arduino_baud_rate:=115200
+
+# VectorNav is started by bringup/hardware_proteus.launch.py and reads port/baud
+# from vendor/vectornav/vectornav/config/vectornav.yaml.
 ```

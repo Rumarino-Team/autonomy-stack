@@ -20,6 +20,7 @@ struct BridgeProteus : public rclcpp::Node {
   std::fstream arduino;
 #ifdef BRIDGE_HARDWARE_ENABLE_VN100
   std::fstream vn100;
+  bool vn100_enabled = false;
 #endif
 
   rclcpp::Subscription<Float64MultiArray>::SharedPtr thrusters_sub;
