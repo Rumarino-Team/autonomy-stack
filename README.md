@@ -205,6 +205,17 @@ colcon build \
     --packages-select interfaces bringup mission_executor bridge_hardware \
     --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
+# Optional: disable VN-100 support at compile time
+# (default is enabled)
+colcon build \
+  --packages-select bridge_hardware \
+  --cmake-args -DBRIDGE_HARDWARE_ENABLE_VN100=OFF
+
+# Optional: explicitly enable VN-100 support
+colcon build \
+  --packages-select bridge_hardware \
+  --cmake-args -DBRIDGE_HARDWARE_ENABLE_VN100=ON
+
 # Source the workspace
 source install/setup.bash
 

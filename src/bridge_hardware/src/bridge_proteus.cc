@@ -18,25 +18,33 @@ std::string checksum(const std::string &cmd) {
 
 BridgeProteus::BridgeProteus() : Node("bridge_proteus") {
   this->declare_parameter<std::string>("arduino_port");
+#ifdef BRIDGE_HARDWARE_ENABLE_VN100
   this->declare_parameter<std::string>("vn100_port");
+#endif
   this->declare_parameter<int>("arduino_baud_rate", 115200);
+#ifdef BRIDGE_HARDWARE_ENABLE_VN100
   this->declare_parameter<int>("vn100_baud_rate", 115200);
+#endif
 
   std::string arduino_port;
   if (!this->get_parameter("arduino_port", arduino_port)) {
     RCLCPP_FATAL(this->get_logger(), "arduino_port not set");
   }
 
+#ifdef BRIDGE_HARDWARE_ENABLE_VN100
   std::string vn100_port;
   if (!this->get_parameter("vn100_port", vn100_port)) {
     RCLCPP_FATAL(this->get_logger(), "vn100_port not set");
   }
+#endif
 
   int arduino_baud_rate;
   this->get_parameter("arduino_baud_rate", arduino_baud_rate);
 
+#ifdef BRIDGE_HARDWARE_ENABLE_VN100
   int vn100_baud_rate;
   this->get_parameter("vn100_baud_rate", vn100_baud_rate);
+#endif
 
   // Setup Arduino serial
   {
@@ -55,6 +63,7 @@ BridgeProteus::BridgeProteus() : Node("bridge_proteus") {
   }
 
   // Setup VN-100 serial
+#ifdef BRIDGE_HARDWARE_ENABLE_VN100
   {
     std::ostringstream oss;
     oss << "stty -F " << vn100_port << " " << vn100_baud_rate
@@ -91,6 +100,7 @@ BridgeProteus::BridgeProteus() : Node("bridge_proteus") {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
   }
+#endif
 
   thrusters_sub = this->create_subscription<Float64MultiArray>(
       "/bridge/thrusters", 10,
@@ -98,6 +108,7 @@ BridgeProteus::BridgeProteus() : Node("bridge_proteus") {
         this->handle_thrusters_msg(thrusters);
       });
 
+#ifdef BRIDGE_HARDWARE_ENABLE_VN100
   imu_pub = this->create_publisher<ImuMsg>("/bridge/imu", 10);
   magnetic_pub =
       this->create_publisher<MagneticFieldMsg>("/bridge/magnetic_field", 10);
@@ -106,6 +117,7 @@ BridgeProteus::BridgeProteus() : Node("bridge_proteus") {
 
   vn_timer = this->create_wall_timer(std::chrono::milliseconds(5),
                                      [this]() { this->read_vn100(); });
+#endif
 }
 
 void BridgeProteus::handle_thrusters_msg(
@@ -116,6 +128,7 @@ void BridgeProteus::handle_thrusters_msg(
 }
 
 void BridgeProteus::read_vn100() {
+#ifdef BRIDGE_HARDWARE_ENABLE_VN100
   std::string line;
   if (!std::getline(vn100, line))
     return;
@@ -218,6 +231,7 @@ void BridgeProteus::read_vn100() {
     // silently ignore malformed data
     return;
   }
+#endif
 }
 
 int main(int argc, char *argv[]) {
