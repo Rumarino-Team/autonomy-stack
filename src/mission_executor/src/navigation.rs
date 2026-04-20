@@ -32,13 +32,20 @@ pub fn get_new_point(
         todo!()
     }
 
-    let midpoint: Point3<f64> = ((&contact.point2.coords + &contact.point1.coords) / 2.0).into();
     let seg_dir = segment.direction().unwrap();
+
+    let dist_to_cuboid = segment.a.coords.metric_distance(&contact.point1.coords);
+
+    let safe_base_point = if dist_to_cuboid < 3.0 {
+        contact.point1.coords - seg_dir.into_inner() * dist_to_cuboid
+    } else {
+        contact.point1.coords
+    };
 
     let points = get_points(
         &cuboid,
         cuboid_pos,
-        &midpoint,
+        &safe_base_point.into(),
         &seg_dir,
         map_bounds,
     );
@@ -97,7 +104,7 @@ fn get_points(
         let world_face = cuboid_pos * face;
 
         //TODO: This should not be a magic number. Also I'm not sure if this is totally safe either
-        let translation = world_face * (dist + 4.0);
+        let translation = world_face * (dist + 2.0);
         let point = midpoint + translation;
 
         let half_extents = map_bounds.size * 0.5;
