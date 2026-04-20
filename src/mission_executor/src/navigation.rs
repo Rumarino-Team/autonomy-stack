@@ -1,7 +1,10 @@
 use crate::{BoundingBox3D, CLOSE_ENOUGH};
-use nalgebra::{Isometry3, Point3, UnitQuaternion, UnitVector3, Vector3};
+use nalgebra::{Isometry3, Matrix3x1, Point3, UnitQuaternion, UnitVector3, Vector3};
 use parry3d_f64::query::{PointQuery, contact};
 use parry3d_f64::shape::{Cuboid, Segment};
+
+//TODO: Idk if you guys want to set this in the configuration of each submarine
+const SUB_EXTENTS: Matrix3x1<f64> = Matrix3x1::new(0.5, 0.5, 0.5);
 
 pub fn get_new_point(
     bbox: &BoundingBox3D,
@@ -43,6 +46,7 @@ pub fn get_new_point(
     };
 
     let points = get_points(
+        &segment.a,
         &cuboid,
         cuboid_pos,
         &safe_base_point.into(),
@@ -65,9 +69,10 @@ pub fn get_new_point(
 }
 
 fn get_points(
+    sub_pos: &Point3<f64>,
     cuboid: &Cuboid,
     cuboid_pos: &Isometry3<f64>,
-    midpoint: &Point3<f64>,
+    basepoint: &Point3<f64>,
     segment_dir: &UnitVector3<f64>,
     map_bounds: &BoundingBox3D,
 ) -> Vec<Point3<f64>> {
@@ -80,7 +85,6 @@ fn get_points(
         (-Vector3::z(), cuboid.half_extents.z),
     ];
 
-    let local_midpoint = cuboid_pos.inverse_transform_vector(&midpoint.coords);
     let colliding_axis = get_dominant_axis(&segment_dir);
 
     let mut points = Vec::with_capacity(4);
@@ -92,20 +96,32 @@ fn get_points(
             continue;
         }
 
-        let axis_value = match axis {
-            0 => local_midpoint.x,
-            1 => local_midpoint.y,
-            2 => local_midpoint.z,
-            _ => panic!(),
-        };
-
-        let dist = (extent - axis_value).abs();
 
         let world_face = cuboid_pos * face;
 
-        //TODO: This should not be a magic number. Also I'm not sure if this is totally safe either
-        let translation = world_face * (dist + 2.0);
-        let point = midpoint + translation;
+        // Get the difference between the face and the basepoint
+        let dist = ((world_face[axis] * extent * 2.0) - basepoint[axis]).abs();
+
+        // Translate by the distance beforementioned and the appropriate submarine dimension. The latter
+        // is to have a bit of safety margin since we're going a straight line to this point 
+        let mut translation = world_face;
+        translation[axis] += dist * face[axis].signum();
+        translation[axis] += SUB_EXTENTS[axis] * face[axis].signum();
+
+        let mut point = basepoint + translation;
+
+        // The idea of this is that if the resulting point is too far from the submarine, we don't want
+        // the submarine to make a straight line and potentially collide with the object in the path to 
+        // the point. So, if this happens we'll translate the point to be nearer to the colliding axis.
+        let axis_diff = (point[axis] - sub_pos[axis]);
+        if axis_diff.abs() > 7.0 {
+            point[colliding_axis] -= axis_diff * 0.1;
+        }
+
+        // Round the numbers by two decimal places. It makes it look nicer and easier to test
+        for num in &mut point.coords {
+            *num = (*num * 100.0).round() / 100.0;
+        }
 
         let half_extents = map_bounds.size * 0.5;
         let bound_cuboid = Cuboid::new(half_extents);
@@ -134,13 +150,13 @@ fn get_dominant_axis(normal: &UnitVector3<f64>) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use nalgebra::{Matrix3x1, Quaternion};
+    use nalgebra::{Matrix3x1, Quaternion, Rotation, Rotation3};
 
     use super::*;
     use crate::Pose;
     fn setup(sub_pos: Matrix3x1<f64>, target_pos: Matrix3x1<f64>, cuboid_pos: Matrix3x1<f64>, cuboid_size: Matrix3x1<f64>, 
-        cuboid_rot: Quaternion<f64>) -> (BoundingBox3D, Isometry3<f64>, Segment, BoundingBox3D) {
-        let center = Pose::new(cuboid_pos, cuboid_rot);
+        cuboid_rot: UnitQuaternion<f64>) -> (BoundingBox3D, Isometry3<f64>, Segment, BoundingBox3D) {
+        let center = Pose::new(cuboid_pos, Quaternion::identity());
         let bbox = BoundingBox3D::new(center, cuboid_size);
 
         let sub_point = Point3::from(sub_pos);
@@ -150,9 +166,8 @@ mod tests {
             target_point,
         );
 
-        let unit_quaternion = UnitQuaternion::from_quaternion(Quaternion::identity());
         let cuboid_pos = Isometry3::from_parts(
-            cuboid_pos.into(), unit_quaternion
+            cuboid_pos.into(), cuboid_rot
         );
 
         let map_pos = Matrix3x1::zeros();
@@ -183,7 +198,7 @@ mod tests {
         let target_pos = Matrix3x1::new(5.0, 5.0, 5.0);
         let cuboid_pos = Matrix3x1::new(-1.0, -1.0, -1.0);
         let cuboid_size = Matrix3x1::new(1.0, 1.0, 1.0);
-        let rot = Quaternion::identity();
+        let rot = UnitQuaternion::identity();
 
         let (bbox, cuboid_pos, segment, map_bounds) = 
             setup(sub_pos, target_pos, cuboid_pos, cuboid_size, rot);
@@ -198,7 +213,26 @@ mod tests {
         let target_pos = Matrix3x1::new(6.0, 6.0, 6.0);
         let cuboid_pos = Matrix3x1::new(3.0, 3.0, 3.0);
         let cuboid_size = Matrix3x1::new(1.0, 1.0, 1.0);
-        let rot = Quaternion::identity();
+        let rot = UnitQuaternion::identity();
+
+        let (bbox, cuboid_pos, segment, map_bounds) = 
+            setup(sub_pos, target_pos, cuboid_pos, cuboid_size, rot);
+
+        let new_point = get_new_point(&bbox, &cuboid_pos, segment, &map_bounds)
+            .expect("Collision didn't happen");
+        let point = Point3::new(3.0, 6.5, 3.0);
+        assert_eq!(point, new_point);
+
+        assert!(!collides(segment.a, bbox, cuboid_pos, new_point))
+    }
+
+    #[test]
+    fn barely_colliding() {
+        let sub_pos = Matrix3x1::zeros();
+        let target_pos = Matrix3x1::new(5.0, 5.0, 5.0);
+        let cuboid_pos = Matrix3x1::new(1.0, 1.0, 1.0);
+        let cuboid_size = Matrix3x1::new(1.0, 1.0, 1.0);
+        let rot = UnitQuaternion::identity();
 
         let (bbox, cuboid_pos, segment, map_bounds) = 
             setup(sub_pos, target_pos, cuboid_pos, cuboid_size, rot);
@@ -210,20 +244,62 @@ mod tests {
 
         assert!(!collides(segment.a, bbox, cuboid_pos, new_point))
     }
-
-    fn barely_colliding() {
+    
+    #[test]
+    fn large_cuboid() {
         let sub_pos = Matrix3x1::zeros();
-        let target_pos = Matrix3x1::new(5.0, 5.0, 5.0);
-        let cuboid_pos = Matrix3x1::new(1.0, 1.0, 1.0);
-        let cuboid_size = Matrix3x1::new(1.0, 1.0, 1.0);
-        let rot = Quaternion::identity();
+        let target_pos = Matrix3x1::new(6.0, 6.0, 6.0);
+        let cuboid_pos = Matrix3x1::new(3.0, 3.0, 3.0);
+        let cuboid_size = Matrix3x1::new(1.0, 10.0, 1.0);
+        let rot = UnitQuaternion::identity();
 
         let (bbox, cuboid_pos, segment, map_bounds) = 
             setup(sub_pos, target_pos, cuboid_pos, cuboid_size, rot);
 
         let new_point = get_new_point(&bbox, &cuboid_pos, segment, &map_bounds)
             .expect("Collision didn't happen");
-        let point = Point3::new(0.0, 2.5, 0.0);
+        let point = Point3::new(3.0, 3.0, 6.5);
+        assert_eq!(point, new_point);
+
+        assert!(!collides(segment.a, bbox, cuboid_pos, new_point))
+    }
+
+    #[test]
+    fn off_center() {
+        let sub_pos = Matrix3x1::new(0.0, -2.0, 6.0);
+        let target_pos = Matrix3x1::new(0.0, -2.0, -5.0);
+        let cuboid_pos = Matrix3x1::new(0.0, -1.0, -2.0);
+        let cuboid_size = Matrix3x1::new(1.0, 10.0, 1.0);
+        let rot = UnitQuaternion::identity();
+
+        let (bbox, cuboid_pos, segment, map_bounds) = 
+            setup(sub_pos, target_pos, cuboid_pos, cuboid_size, rot);
+
+        let new_point = get_new_point(&bbox, &cuboid_pos, segment, &map_bounds)
+            .expect("Collision didn't happen");
+        let point = Point3::new(2.5, -2.0, -1.79);
+        assert_eq!(point, new_point);
+
+        assert!(!collides(segment.a, bbox, cuboid_pos, new_point))
+    }
+
+    #[test]
+    #[ignore]
+    // Do we even care about rotation? This will fail btw
+    fn rotation() {
+        let sub_pos = Matrix3x1::zeros();
+        let target_pos = Matrix3x1::new(5.0, 0.0, 5.0);
+        let cuboid_pos = Matrix3x1::new(5.0, -2.0, 3.0);
+        let cuboid_size = Matrix3x1::new(1.0, 10.0, 1.0);
+        let rotmat = Rotation3::from_euler_angles(0.0, 60.0_f64.to_radians(), 60.0_f64.to_radians());
+        let rot = UnitQuaternion::from_rotation_matrix(&rotmat);
+
+        let (bbox, cuboid_pos, segment, map_bounds) = 
+            setup(sub_pos, target_pos, cuboid_pos, cuboid_size, rot);
+
+        let new_point = get_new_point(&bbox, &cuboid_pos, segment, &map_bounds)
+            .expect("Collision didn't happen");
+        let point = Point3::new(3.0, 3.0, 6.5);
         assert_eq!(point, new_point);
 
         assert!(!collides(segment.a, bbox, cuboid_pos, new_point))
