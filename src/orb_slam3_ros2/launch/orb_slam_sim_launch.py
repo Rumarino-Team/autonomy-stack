@@ -17,6 +17,8 @@ def generate_launch_description():
     image_topic = LaunchConfiguration("image_topic")
     depth_topic = LaunchConfiguration("depth_topic")
     imu_topic = LaunchConfiguration("imu_topic")
+    world_frame_id = LaunchConfiguration("world_frame_id")
+    camera_frame_id = LaunchConfiguration("camera_frame_id")
     
     # Load ORB-SLAM3 settings
     settings_file = os.path.join(orb_slam_share, "config", "stonefish_hydrus.yaml")
@@ -54,6 +56,16 @@ def generate_launch_description():
             default_value="/hydrus/imu",
             description="IMU topic consumed by ORB-SLAM3"
         ),
+        DeclareLaunchArgument(
+            "world_frame_id",
+            default_value="world",
+            description="World frame used by ORB-SLAM3"
+        ),
+        DeclareLaunchArgument(
+            "camera_frame_id",
+            default_value="hydrus_camera",
+            description="Camera frame used by ORB-SLAM3"
+        ),
         
         # ORB-SLAM3 Node
         Node(
@@ -76,8 +88,8 @@ def generate_launch_description():
                     "odom_topic": "orb_slam3/camera_odom",
                     "path_topic": "orb_slam3/camera_path",
                     # Frame IDs
-                    "world_frame_id": "world",
-                    "camera_frame_id": "hydrus_camera",
+                    "world_frame_id": world_frame_id,
+                    "camera_frame_id": camera_frame_id,
                     "queue_size": 10,
                     "publish_tf": True,
                 }
