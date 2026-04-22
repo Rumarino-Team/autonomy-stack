@@ -38,6 +38,38 @@ ThDepth: 40.0
 DepthMapFactor: 1.0
 
 #--------------------------------------------------------------------------------------------
+# IMU Parameters (required for monocular-inertial mode)
+#--------------------------------------------------------------------------------------------
+IMU.NoiseGyro: 1.7e-4
+IMU.NoiseAcc: 2.0e-3
+IMU.GyroWalk: 1.9e-5
+IMU.AccWalk: 3.0e-3
+IMU.Frequency: 200
+
+# Left camera to IMU transform (4x4)
+Tbc: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [1.0, 0.0, 0.0, 0.0,
+          0.0, 1.0, 0.0, 0.0,
+          0.0, 0.0, 1.0, 0.0,
+          0.0, 0.0, 0.0, 1.0]
+
+# Keep both keys for compatibility across ORB-SLAM3 forks
+IMU.T_b_c1: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [1.0, 0.0, 0.0, 0.0,
+          0.0, 1.0, 0.0, 0.0,
+          0.0, 0.0, 1.0, 0.0,
+          0.0, 0.0, 0.0, 1.0]
+
+InsertKFsWhenLost: 1
+IMU.InsertKFsWhenLost: 1
+
+#--------------------------------------------------------------------------------------------
 # ORB Parameters
 #--------------------------------------------------------------------------------------------
 ORBextractor.nFeatures: 1000

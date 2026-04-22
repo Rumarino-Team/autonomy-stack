@@ -1,7 +1,10 @@
 from launch_ros.actions import Node
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
 import os
 from ament_index_python.packages import get_package_share_directory
 
@@ -19,9 +22,12 @@ def generate_launch_description():
     imu_topic = LaunchConfiguration("imu_topic")
     world_frame_id = LaunchConfiguration("world_frame_id")
     camera_frame_id = LaunchConfiguration("camera_frame_id")
+    settings_file = LaunchConfiguration("settings_file")
+    use_usb_cam = LaunchConfiguration("use_usb_cam")
+    use_vectornav = LaunchConfiguration("use_vectornav")
     
     # Load ORB-SLAM3 settings
-    settings_file = os.path.join(orb_slam_share, "config", "stonefish_hydrus.yaml")
+    default_settings_file = os.path.join(orb_slam_share, "config", "stonefish_hydrus.yaml")
     vocabulary_file = "/home/cesar/autonomy-stack/vendor/ORBvoc.txt"
     
     return LaunchDescription([
@@ -65,6 +71,41 @@ def generate_launch_description():
             "camera_frame_id",
             default_value="hydrus_camera",
             description="Camera frame used by ORB-SLAM3"
+        ),
+        DeclareLaunchArgument(
+            "settings_file",
+            default_value=default_settings_file,
+            description="ORB-SLAM3 settings YAML path"
+        ),
+        DeclareLaunchArgument(
+            "use_usb_cam",
+            default_value="false",
+            description="Start usb_cam node in this launch"
+        ),
+        DeclareLaunchArgument(
+            "use_vectornav",
+            default_value="false",
+            description="Start vectornav nodes in this launch"
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([
+                    FindPackageShare("vectornav"),
+                    "launch",
+                    "vectornav.launch.py",
+                ])
+            ),
+            condition=IfCondition(use_vectornav),
+        ),
+
+        Node(
+            package="usb_cam",
+            executable="usb_cam_node_exe",
+            name="usb_cam",
+            namespace="usb_cam",
+            output="screen",
+            condition=IfCondition(use_usb_cam),
         ),
         
         # ORB-SLAM3 Node

@@ -28,7 +28,22 @@ find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(message_filters REQUIRED)
 
-find_package(OpenCV 4.4 REQUIRED)
+# Resolve OpenCV for headers. We intentionally avoid linking OpenCV directly
+# in this package to prevent mixing OpenCV ABIs with prebuilt ORB_SLAM3/cv_bridge.
+set(CV_BRIDGE_OPENCV_VERSION "")
+if(DEFINED OpenCV_VERSION)
+  set(CV_BRIDGE_OPENCV_VERSION "${OpenCV_VERSION}")
+endif()
+
+find_package(OpenCV 4 REQUIRED)
+message(STATUS "Resolved OpenCV version: ${OpenCV_VERSION}")
+if(CV_BRIDGE_OPENCV_VERSION AND NOT OpenCV_VERSION VERSION_EQUAL CV_BRIDGE_OPENCV_VERSION)
+  message(WARNING
+    "OpenCV mismatch detected (cv_bridge: ${CV_BRIDGE_OPENCV_VERSION}, this package: ${OpenCV_VERSION}). "
+    "Direct OpenCV linkage is disabled in orb_slam3_ros2 to reduce ABI conflicts."
+  )
+endif()
+
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
 
@@ -96,7 +111,6 @@ target_link_libraries(orb_slam_node
   ${ORB_SLAM3_LIBRARY}            
   ${DBOW2_LIBRARY}               
   ${G2O_LIBRARY}                  
-  ${OpenCV_LIBS}
   ${EIGEN3_LIBS}
   ${Pangolin_LIBRARIES}
   cv_bridge::cv_bridge           
@@ -110,6 +124,7 @@ target_link_libraries(orb_slam_node
 target_include_directories(orb_slam_node PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${ORB_SLAM3_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${Pangolin_INCLUDE_DIRS}
 )

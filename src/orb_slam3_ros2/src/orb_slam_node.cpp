@@ -18,6 +18,8 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <atomic>
+#include <deque>
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -179,10 +181,13 @@ public:
             RCLCPP_INFO(this->get_logger(), "Shutting down ORB-SLAM3...");
             slam_system_->Shutdown();
 
-            // Save trajectory
-            slam_system_->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
-            slam_system_->SaveTrajectoryTUM("CameraTrajectory.txt");
-            RCLCPP_INFO(this->get_logger(), "Trajectories saved!");
+            if (has_valid_pose_.load()) {
+                slam_system_->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+                slam_system_->SaveTrajectoryTUM("CameraTrajectory.txt");
+                RCLCPP_INFO(this->get_logger(), "Trajectories saved!");
+            } else {
+                RCLCPP_WARN(this->get_logger(), "Skipping trajectory export: no valid poses were tracked.");
+            }
         }
     }
 
@@ -220,60 +225,85 @@ private:
 
         // Get timestamp
         double timestamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+        if (last_image_timestamp_ > 0.0 && timestamp <= last_image_timestamp_) {
+            RCLCPP_WARN_THROTTLE(
+                this->get_logger(),
+                *this->get_clock(),
+                2000,
+                "Dropping non-increasing image timestamp: %.9f (last %.9f)",
+                timestamp,
+                last_image_timestamp_
+            );
+            return;
+        }
 
         Sophus::SE3f Tcw_se3;
-        
-        // Use appropriate tracking mode
-        if (use_depth_) {
-            std::lock_guard<std::mutex> lock(depth_mutex_);
-            
-            if (latest_depth_) {
-                // RGB-D tracking
-                Tcw_se3 = slam_system_->TrackRGBD(cv_ptr->image, latest_depth_->image, timestamp);
-            } else {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                    "RGB-D mode enabled but no depth data received yet");
-                return;
-            }
-        } else if (use_imu_) {
-            // IMU-Monocular tracking with preintegration
-            std::vector<ORB_SLAM3::IMU::Point> vImuMeas;
-            
-            {
-                std::lock_guard<std::mutex> lock(imu_mutex_);
-                
-                // Convert buffered ROS IMU messages to ORB-SLAM3 format
-                for (const auto& imu_msg : imu_buffer_) {
-                    double imu_timestamp = imu_msg->header.stamp.sec + imu_msg->header.stamp.nanosec * 1e-9;
-                    
-                    // Create IMU measurement (acceleration, angular velocity, timestamp)
-                    ORB_SLAM3::IMU::Point imu_point(
-                        imu_msg->linear_acceleration.x,
-                        imu_msg->linear_acceleration.y,
-                        imu_msg->linear_acceleration.z,
-                        imu_msg->angular_velocity.x,
-                        imu_msg->angular_velocity.y,
-                        imu_msg->angular_velocity.z,
-                        imu_timestamp
-                    );
-                    vImuMeas.push_back(imu_point);
+
+        try {
+            // Use appropriate tracking mode
+            if (use_depth_) {
+                std::lock_guard<std::mutex> lock(depth_mutex_);
+
+                if (latest_depth_) {
+                    // RGB-D tracking
+                    Tcw_se3 = slam_system_->TrackRGBD(cv_ptr->image, latest_depth_->image, timestamp);
+                } else {
+                    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                        "RGB-D mode enabled but no depth data received yet");
+                    return;
                 }
-                
-                // Clear buffer after processing
-                imu_buffer_.clear();
-            }
-            
-            // Monocular + IMU tracking with preintegration
-            Tcw_se3 = slam_system_->TrackMonocular(cv_ptr->image, timestamp, vImuMeas);
-            
-            if (!vImuMeas.empty()) {
+            } else if (use_imu_) {
+                // IMU-Monocular tracking with timestamp-aligned preintegration
+                std::vector<ORB_SLAM3::IMU::Point> vImuMeas;
+
+                {
+                    std::lock_guard<std::mutex> lock(imu_mutex_);
+
+                    while (!imu_buffer_.empty()) {
+                        const auto& imu_msg = imu_buffer_.front();
+                        double imu_timestamp = imu_msg->header.stamp.sec + imu_msg->header.stamp.nanosec * 1e-9;
+
+                        if (imu_timestamp > timestamp) {
+                            break;
+                        }
+
+                        ORB_SLAM3::IMU::Point imu_point(
+                            imu_msg->linear_acceleration.x,
+                            imu_msg->linear_acceleration.y,
+                            imu_msg->linear_acceleration.z,
+                            imu_msg->angular_velocity.x,
+                            imu_msg->angular_velocity.y,
+                            imu_msg->angular_velocity.z,
+                            imu_timestamp
+                        );
+                        vImuMeas.push_back(imu_point);
+                        imu_buffer_.pop_front();
+                    }
+                }
+
+                if (vImuMeas.empty()) {
+                    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                        "Waiting for IMU samples at or before image timestamp");
+                    return;
+                }
+
+                Tcw_se3 = slam_system_->TrackMonocular(cv_ptr->image, timestamp, vImuMeas);
+
                 RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                     "Using %zu IMU measurements for tracking", vImuMeas.size());
+            } else {
+                // Monocular tracking (no IMU)
+                Tcw_se3 = slam_system_->TrackMonocular(cv_ptr->image, timestamp);
             }
-        } else {
-            // Monocular tracking (no IMU)
-            Tcw_se3 = slam_system_->TrackMonocular(cv_ptr->image, timestamp);
+        } catch (const cv::Exception& e) {
+            RCLCPP_ERROR(this->get_logger(), "ORB-SLAM OpenCV exception: %s", e.what());
+            return;
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR(this->get_logger(), "ORB-SLAM exception: %s", e.what());
+            return;
         }
+
+        last_image_timestamp_ = timestamp;
 
         // Check if tracking succeeded
         const float eps = 1e-6f;
@@ -294,6 +324,7 @@ private:
         Tcw.at<float>(2, 3) = t(2);
 
         // Publish pose
+        has_valid_pose_.store(true);
         publishPose(Tcw, msg->header.stamp);
     }
 
@@ -429,8 +460,11 @@ private:
     std::mutex depth_mutex_;
     
     // IMU data buffer for preintegration
-    std::vector<sensor_msgs::msg::Imu::SharedPtr> imu_buffer_;
+    std::deque<sensor_msgs::msg::Imu::SharedPtr> imu_buffer_;
     std::mutex imu_mutex_;
+
+    double last_image_timestamp_ = 0.0;
+    std::atomic<bool> has_valid_pose_{false};
 };
 
 int main(int argc, char** argv)
