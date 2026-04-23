@@ -112,7 +112,9 @@ cd ../../../../../
 
 ```sh
 colcon build --packages-select zed_msg zed_custom_wrapper && source ./install/setup.bash && ros2 launch zed_custom_wrapper zed_custom.launch.py onnx_model_path:=./src/zed_custom_wrapper/yolov8n.onnx
-### Jetson run using prebuilt artifacts
+```
+
+### Jetson run using prebuilt Orb-Slam3 libraries
 
 This is the recommended path on Jetson devices when ORB-SLAM3 cannot be compiled locally.
 
@@ -123,53 +125,38 @@ curl -L -o /tmp/orbslam-artifacts.zip \
   https://github.com/Rumarino-Team/autonomy-stack/releases/download/orb_slam_libs/artifacts.zip
 ```
 
-#### 2. Install the bundle into the workspace
+#### 2. Install the bundle into the workspace (Jetson Only)
 ```bash
 rm -rf /tmp/orbslam-artifacts-extract
 mkdir -p /tmp/orbslam-artifacts-extract
 unzip -o /tmp/orbslam-artifacts.zip -d /tmp/orbslam-artifacts-extract
-
-ART=/tmp/orbslam-artifacts-extract/artifacts/orbslam-arm64
-
-mkdir -p \
-  vendor/ORB_SLAM3/lib \
-  vendor/ORB_SLAM3/Thirdparty/DBoW2/lib \
-  vendor/ORB_SLAM3/Thirdparty/g2o/lib \
-  vendor/ORB_SLAM3/runtime-lib \
-  install/orb_slam3_ros2/lib/orb_slam3_ros2 \
-  install/orb_slam3_ros2/share/orb_slam3_ros2/config \
-  install/orb_slam3_ros2/share/orb_slam3_ros2/launch \
-  install/orb_slam3_ros2/share/ament_index/resource_index/packages
-
-install -m 755 "$ART/lib/libORB_SLAM3.so" vendor/ORB_SLAM3/lib/libORB_SLAM3.so
-install -m 755 "$ART/lib/libDBoW2.so" vendor/ORB_SLAM3/Thirdparty/DBoW2/lib/libDBoW2.so
-install -m 755 "$ART/lib/libg2o.so" vendor/ORB_SLAM3/Thirdparty/g2o/lib/libg2o.so
-install -m 755 "$ART/lib/libpango_core.so.0" vendor/ORB_SLAM3/runtime-lib/libpango_core.so.0
-install -m 755 "$ART/lib/libpango_display.so.0" vendor/ORB_SLAM3/runtime-lib/libpango_display.so.0
-install -m 755 "$ART/lib/libpango_opengl.so.0" vendor/ORB_SLAM3/runtime-lib/libpango_opengl.so.0
-install -m 755 "$ART/lib/libpango_vars.so.0" vendor/ORB_SLAM3/runtime-lib/libpango_vars.so.0
-install -m 755 "$ART/bin/orb_slam_node" install/orb_slam3_ros2/lib/orb_slam3_ros2/orb_slam_node
-install -m 644 "$ART/config/ORBvoc.txt" vendor/ORBvoc.txt
-install -m 644 src/orb_slam3_ros2/package.xml install/orb_slam3_ros2/share/orb_slam3_ros2/package.xml
-cp -f src/orb_slam3_ros2/launch/*.py install/orb_slam3_ros2/share/orb_slam3_ros2/launch/
-cp -f src/orb_slam3_ros2/config/* install/orb_slam3_ros2/share/orb_slam3_ros2/config/
-touch install/orb_slam3_ros2/share/ament_index/resource_index/packages/orb_slam3_ros2
+ART=/tmp/orbslam-artifacts-extract/artifacts/orbslam-arm64/
+sudo install -m 644 $ART/lib/* /usr/lib/ && sudo ldconfig
 ```
 
 #### 3. Run the launch file
 ```bash
-source /opt/ros/humble/setup.bash
-export AMENT_PREFIX_PATH=/home/cesar/autonomy-stack/install/orb_slam3_ros2:$AMENT_PREFIX_PATH
-export LD_LIBRARY_PATH=/home/cesar/autonomy-stack/vendor/ORB_SLAM3/lib:/home/cesar/autonomy-stack/vendor/ORB_SLAM3/Thirdparty/DBoW2/lib:/home/cesar/autonomy-stack/vendor/ORB_SLAM3/Thirdparty/g2o/lib:/home/cesar/autonomy-stack/vendor/ORB_SLAM3/runtime-lib:$LD_LIBRARY_PATH
-
 ros2 launch orb_slam3_ros2 orb_slam_sim_launch.py
+```
+
+
+Example using all optional arguments:
+
+```bash
+ros2 launch orb_slam3_ros2 orb_slam_sim_launch.py \
+  use_viewer:=true \
+  use_imu:=true \
+  use_depth:=false \
+  image_topic:=/camera/color/image_raw \
+  depth_topic:=/camera/depth/image_raw \
+  imu_topic:=/vectornav/imu \
+  settings_file:=/home/cesar/autonomy-stack/src/orb_slam3_ros2/config/webcamera.yaml \
+  use_usb_cam:=true \
+  use_vectornav:=true
 ```
 
 #### Notes
 * The artifact bundle is built for Jetson-compatible Ubuntu 22.04 / ROS Humble ABI levels.
-* If `ros2 launch` cannot find `orb_slam3_ros2`, re-run step 2 so the ament index file exists.
-* If a library is missing at runtime, verify the files exist in `vendor/ORB_SLAM3/runtime-lib` and that `LD_LIBRARY_PATH` includes that directory.
-```
 
 
 

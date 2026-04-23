@@ -17,6 +17,7 @@ def generate_launch_description():
     use_vectornav_arg = DeclareLaunchArgument('use_vectornav', default_value='true')
     use_usb_cam_arg = DeclareLaunchArgument('use_usb_cam', default_value='false')
     use_orb_slam_arg = DeclareLaunchArgument('use_orb_slam', default_value='false')
+    orb_use_viewer_arg = DeclareLaunchArgument('orb_use_viewer', default_value='false')
     world_frame_arg = DeclareLaunchArgument('world_frame', default_value='world')
     base_frame_arg = DeclareLaunchArgument('base_frame', default_value='base_link')
     imu_frame_arg = DeclareLaunchArgument('imu_frame', default_value='vectornav')
@@ -43,6 +44,7 @@ def generate_launch_description():
     use_vectornav = LaunchConfiguration(use_vectornav_arg.name)
     use_usb_cam = LaunchConfiguration(use_usb_cam_arg.name)
     use_orb_slam = LaunchConfiguration(use_orb_slam_arg.name)
+    orb_use_viewer = LaunchConfiguration(orb_use_viewer_arg.name)
     world_frame = LaunchConfiguration(world_frame_arg.name)
     base_frame = LaunchConfiguration(base_frame_arg.name)
     imu_frame = LaunchConfiguration(imu_frame_arg.name)
@@ -80,9 +82,14 @@ def generate_launch_description():
             ])
         ),
         launch_arguments={
-            'use_viewer': 'false',
+            'use_viewer': orb_use_viewer,
             'use_imu': 'true',
             'use_depth': 'false',
+            'settings_file': PathJoinSubstitution([
+                FindPackageShare('orb_slam3_ros2'),
+                'config',
+                'webcamera.yaml',
+            ]),
             'image_topic': '/usb_cam/image_raw',
             'imu_topic': '/vectornav/imu',
             'world_frame_id': world_frame,
@@ -99,6 +106,7 @@ def generate_launch_description():
         use_vectornav_arg,
         use_usb_cam_arg,
         use_orb_slam_arg,
+        orb_use_viewer_arg,
         world_frame_arg,
         base_frame_arg,
         imu_frame_arg,
