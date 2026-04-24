@@ -195,6 +195,15 @@
 	<ros_publisher topic="/bridge/imu" />
 	</sensor>
 
+		<sensor name="Pressure" rate="20.0" type="pressure">
+			<range pressure="10000.0" />
+			<noise pressure="5.0" />
+			<history samples="1" />
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+			<link name="Proteus" />
+			<ros_publisher topic="/bridge/fluid_pressure" />
+		</sensor>
+
 
 
 	<sensor name="Camera" rate="21.0" type="camera">
