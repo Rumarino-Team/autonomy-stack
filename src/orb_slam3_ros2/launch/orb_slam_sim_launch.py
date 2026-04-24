@@ -25,6 +25,25 @@ def generate_launch_description():
     settings_file = LaunchConfiguration("settings_file")
     use_usb_cam = LaunchConfiguration("use_usb_cam")
     use_vectornav = LaunchConfiguration("use_vectornav")
+    usb_cam_video_device = LaunchConfiguration("usb_cam_video_device")
+    usb_cam_framerate = LaunchConfiguration("usb_cam_framerate")
+    usb_cam_io_method = LaunchConfiguration("usb_cam_io_method")
+    usb_cam_pixel_format = LaunchConfiguration("usb_cam_pixel_format")
+    usb_cam_image_width = LaunchConfiguration("usb_cam_image_width")
+    usb_cam_image_height = LaunchConfiguration("usb_cam_image_height")
+    usb_cam_camera_info_url = LaunchConfiguration("usb_cam_camera_info_url")
+    usb_cam_camera_name = LaunchConfiguration("usb_cam_camera_name")
+    usb_cam_brightness = LaunchConfiguration("usb_cam_brightness")
+    usb_cam_contrast = LaunchConfiguration("usb_cam_contrast")
+    usb_cam_saturation = LaunchConfiguration("usb_cam_saturation")
+    usb_cam_sharpness = LaunchConfiguration("usb_cam_sharpness")
+    usb_cam_gain = LaunchConfiguration("usb_cam_gain")
+    usb_cam_auto_white_balance = LaunchConfiguration("usb_cam_auto_white_balance")
+    usb_cam_white_balance = LaunchConfiguration("usb_cam_white_balance")
+    usb_cam_autoexposure = LaunchConfiguration("usb_cam_autoexposure")
+    usb_cam_exposure = LaunchConfiguration("usb_cam_exposure")
+    usb_cam_autofocus = LaunchConfiguration("usb_cam_autofocus")
+    usb_cam_focus = LaunchConfiguration("usb_cam_focus")
     
     # Load ORB-SLAM3 settings
     default_settings_file = os.path.join(orb_slam_share, "config", "stonefish_hydrus.yaml")
@@ -87,6 +106,101 @@ def generate_launch_description():
             default_value="false",
             description="Start vectornav nodes in this launch"
         ),
+        DeclareLaunchArgument(
+            "usb_cam_video_device",
+            default_value="/dev/video0",
+            description="V4L2 device path for usb_cam"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_framerate",
+            default_value="30.0",
+            description="Camera output frame rate (Hz)"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_io_method",
+            default_value="mmap",
+            description="usb_cam io method (mmap/read/userptr)"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_pixel_format",
+            default_value="mjpeg2rgb",
+            description="usb_cam pixel format"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_image_width",
+            default_value="640",
+            description="usb_cam image width"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_image_height",
+            default_value="480",
+            description="usb_cam image height"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_camera_info_url",
+            default_value="",
+            description="CameraInfo URL (e.g. file:///tmp/camera_info.yaml)"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_camera_name",
+            default_value="laptop_webcam",
+            description="Camera name published in CameraInfo"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_brightness",
+            default_value="-1",
+            description="usb_cam brightness (-1 leaves driver default)"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_contrast",
+            default_value="-1",
+            description="usb_cam contrast (-1 leaves driver default)"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_saturation",
+            default_value="-1",
+            description="usb_cam saturation (-1 leaves driver default)"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_sharpness",
+            default_value="-1",
+            description="usb_cam sharpness (-1 leaves driver default)"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_gain",
+            default_value="-1",
+            description="usb_cam gain (-1 leaves driver default)"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_auto_white_balance",
+            default_value="true",
+            description="Enable automatic white balance"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_white_balance",
+            default_value="4000",
+            description="Manual white balance value"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_autoexposure",
+            default_value="true",
+            description="Enable automatic exposure"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_exposure",
+            default_value="100",
+            description="Manual exposure value"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_autofocus",
+            default_value="false",
+            description="Enable autofocus"
+        ),
+        DeclareLaunchArgument(
+            "usb_cam_focus",
+            default_value="-1",
+            description="Manual focus value"
+        ),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -105,6 +219,28 @@ def generate_launch_description():
             name="usb_cam",
             namespace="usb_cam",
             output="screen",
+            parameters=[{
+                "video_device": usb_cam_video_device,
+                "framerate": usb_cam_framerate,
+                "io_method": usb_cam_io_method,
+                "frame_id": camera_frame_id,
+                "pixel_format": usb_cam_pixel_format,
+                "camera_name": usb_cam_camera_name,
+                "image_width": usb_cam_image_width,
+                "image_height": usb_cam_image_height,
+                "camera_info_url": usb_cam_camera_info_url,
+                "brightness": usb_cam_brightness,
+                "contrast": usb_cam_contrast,
+                "saturation": usb_cam_saturation,
+                "sharpness": usb_cam_sharpness,
+                "gain": usb_cam_gain,
+                "auto_white_balance": usb_cam_auto_white_balance,
+                "white_balance": usb_cam_white_balance,
+                "autoexposure": usb_cam_autoexposure,
+                "exposure": usb_cam_exposure,
+                "autofocus": usb_cam_autofocus,
+                "focus": usb_cam_focus,
+            }],
             condition=IfCondition(use_usb_cam),
         ),
         

@@ -128,6 +128,16 @@ IMU.AccWalk: 3.0e-3
 # Must match your IMU data rate
 IMU.Frequency: 200
 
+# Left camera to IMU transform (4x4)
+Tbc: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: f
+   data: [0.0757822598, -0.952608595, 0.294608068, 0.00524912371,
+          0.553797745, -0.205488663, -0.806896813, 0.00758131847,
+          0.829195457, 0.224301748, 0.511980097, -3.27803068e-05,
+          0, 0, 0, 1]
+
 # Transformation from body (IMU) frame to camera frame (T_b_c1)
 # This is the extrinsic calibration between IMU and camera
 # Should be calibrated using tools like Kalibr
@@ -136,10 +146,10 @@ IMU.T_b_c1: !!opencv-matrix
    rows: 4
    cols: 4
    dt: f
-   data: [1.0, 0.0, 0.0, 0.0,
-          0.0, 1.0, 0.0, 0.0,
-          0.0, 0.0, 1.0, 0.0,
-          0.0, 0.0, 0.0, 1.0]
+   data: [0.0757822598, -0.952608595, 0.294608068, 0.00524912371,
+          0.553797745, -0.205488663, -0.806896813, 0.00758131847,
+          0.829195457, 0.224301748, 0.511980097, -3.27803068e-05,
+          0, 0, 0, 1]
 
 # Insert keyframes when tracking is lost (IMU-inertial mode)
 # 1 = true, 0 = false
