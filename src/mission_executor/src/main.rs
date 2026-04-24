@@ -60,9 +60,15 @@ struct MissionExecutor {
 const CLOSE_ENOUGH: f64 = 1.0;
 const THRUSTER_USAGE: f64 = 7000.0; //in milliamps
 const BATTERY_CAPACITY: f64 = 5000.0; //in mAh
+const WATER_DENSITY: f64 = 997.0; // kg/m^3
+const GRAVITY: f64 = 9.80665; // m/s^2
 
 fn wrap_angle(angle: f64) -> f64 {
     (angle + std::f64::consts::PI).rem_euclid(2.0 * std::f64::consts::PI) - std::f64::consts::PI
+}
+
+fn pressure_to_depth(pressure: f64, reference_pressure: f64) -> f64 {
+    (pressure - reference_pressure) / (WATER_DENSITY * GRAVITY)
 }
 
 impl MissionExecutor {
@@ -276,6 +282,7 @@ fn load_live_config(path: &str, auv_name: &str) -> Option<LiveConfig> {
 type MapMsg = r2r::interfaces::msg::Map;
 type OdometryMsg = r2r::nav_msgs::msg::Odometry;
 type ImuMsg = r2r::sensor_msgs::msg::Imu;
+type PressureMsg = r2r::sensor_msgs::msg::FluidPressure;
 type Float64MultiArray = r2r::std_msgs::msg::Float64MultiArray;
 
 #[tokio::main]
@@ -335,6 +342,9 @@ async fn main() {
     let mut imu_sub = node
         .subscribe::<ImuMsg>("/bridge/imu", r2r::QosProfile::default())
         .expect("Failed to subscribe to odometry");
+    let mut pressure_sub = node
+        .subscribe::<PressureMsg>("/bridge/fluid_pressure", r2r::QosProfile::default())
+        .expect("Failed to subscribe to pressure");
     let thrusters_pub = node
         .create_publisher::<Float64MultiArray>("/bridge/thrusters", r2r::QosProfile::default())
         .expect("Failed to setup thruster publisher");
@@ -358,11 +368,31 @@ async fn main() {
         while let Some(msg) = imu_sub.next().await {
             let imu_o = msg.orientation;
             let imu_a = msg.linear_acceleration;
+            let current_pose = td.pose.load();
             let imu_quat = Quaternion::new(imu_o.w, imu_o.x, imu_o.y, imu_o.z);
             let pose = Pose {
-                // NOTE: were setting acceleration in the pose field :(
-                pos: Vector3::new(imu_a.x, imu_a.y, imu_a.z),
+                // Keep x/y from current logic, but z now comes from pressure callback.
+                pos: Vector3::new(imu_a.x, imu_a.y, current_pose.pos.z),
                 rot: imu_quat,
+            };
+
+            td.pose.store(Arc::new(pose));
+        }
+    };
+
+    let consume_pressure_sub = |td: Arc<MissionExecutor>| async move {
+        let mut reference_pressure: Option<f64> = None;
+        let mut reference_z: Option<f64> = None;
+
+        while let Some(msg) = pressure_sub.next().await {
+            let current_pose = td.pose.load();
+            let ref_p = reference_pressure.get_or_insert(msg.fluid_pressure);
+            let ref_z = reference_z.get_or_insert(current_pose.pos.z);
+
+            let depth = pressure_to_depth(msg.fluid_pressure, *ref_p);
+            let pose = Pose {
+                pos: Vector3::new(current_pose.pos.x, current_pose.pos.y, *ref_z - depth),
+                rot: current_pose.rot,
             };
 
             td.pose.store(Arc::new(pose));
@@ -537,6 +567,7 @@ async fn main() {
     tokio::spawn(consume_inotify_stream());
     tokio::spawn(consume_map_sub(Arc::clone(&td)));
     tokio::spawn(consume_imu_sub(Arc::clone(&td)));
+    tokio::spawn(consume_pressure_sub(Arc::clone(&td)));
     // tokio::spawn(consume_odometry_sub(Arc::clone(&td)));
     tokio::spawn(consume_new_objects(Arc::clone(&td)));
     tokio::spawn(go_to_goal(Arc::clone(&td)));
