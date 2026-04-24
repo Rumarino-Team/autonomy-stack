@@ -51,6 +51,7 @@ struct MissionExecutor {
     pub map_objects_reacted: AtomicUsize,
     pub new_objects: Notify,
     pub pose: ArcSwap<Pose>,
+    // pub imu: ArcSwap<ImuMsg>,
     pub goal: ArcSwap<Vector6<f64>>,
     pub stop: AtomicBool,
     pub avg_current: Arc<Mutex<f64>>,
@@ -93,6 +94,7 @@ impl MissionExecutor {
         old_goal.z = dest.z;
         self.goal.store(Arc::new(old_goal));
         while !self.stop.load(Ordering::Relaxed) {
+            // let pose = self.pose.load();
             let pose = self.pose.load();
             let goal = self.goal.load();
             let dist = pose.pos.metric_distance(&dest);
@@ -273,6 +275,7 @@ fn load_live_config(path: &str, auv_name: &str) -> Option<LiveConfig> {
 
 type MapMsg = r2r::interfaces::msg::Map;
 type OdometryMsg = r2r::nav_msgs::msg::Odometry;
+type ImuMsg = r2r::sensor_msgs::msg::Imu;
 type Float64MultiArray = r2r::std_msgs::msg::Float64MultiArray;
 
 #[tokio::main]
@@ -326,8 +329,11 @@ async fn main() {
     let mut map_sub = node
         .subscribe::<MapMsg>("/vision/map", map_qos)
         .expect("Failed to subscribe to map");
-    let mut odometry_sub = node
-        .subscribe::<OdometryMsg>("/bridge/odometry", r2r::QosProfile::default())
+    // let mut odometry_sub = node
+    //     .subscribe::<OdometryMsg>("/bridge/odometry", r2r::QosProfile::default())
+    //     .expect("Failed to subscribe to odometry");
+    let mut imu_sub = node
+        .subscribe::<ImuMsg>("/bridge/imu", r2r::QosProfile::default())
         .expect("Failed to subscribe to odometry");
     let thrusters_pub = node
         .create_publisher::<Float64MultiArray>("/bridge/thrusters", r2r::QosProfile::default())
@@ -342,9 +348,24 @@ async fn main() {
         }
     };
 
-    let consume_odometry_sub = |td: Arc<MissionExecutor>| async move {
-        while let Some(msg) = odometry_sub.next().await {
-            td.pose.store(Arc::new(Pose::from(&msg.pose.pose)));
+    // let consume_odometry_sub = |td: Arc<MissionExecutor>| async move {
+    //     while let Some(msg) = odometry_sub.next().await {
+    //         td.pose.store(Arc::new(Pose::from(&msg.pose.pose)));
+    //     }
+    // };
+
+    let consume_imu_sub = |td: Arc<MissionExecutor>| async move {
+        while let Some(msg) = imu_sub.next().await {
+            let imu_o = msg.orientation;
+            let imu_a = msg.linear_acceleration;
+            let imu_quat = Quaternion::new(imu_o.w, imu_o.x, imu_o.y, imu_o.z);
+            let pose = Pose {
+                // NOTE: were setting acceleration in the pose field :(
+                pos: Vector3::new(imu_a.x, imu_a.y, imu_a.z),
+                rot: imu_quat,
+            };
+
+            td.pose.store(Arc::new(pose));
         }
     };
 
@@ -515,7 +536,8 @@ async fn main() {
 
     tokio::spawn(consume_inotify_stream());
     tokio::spawn(consume_map_sub(Arc::clone(&td)));
-    tokio::spawn(consume_odometry_sub(Arc::clone(&td)));
+    tokio::spawn(consume_imu_sub(Arc::clone(&td)));
+    // tokio::spawn(consume_odometry_sub(Arc::clone(&td)));
     tokio::spawn(consume_new_objects(Arc::clone(&td)));
     tokio::spawn(go_to_goal(Arc::clone(&td)));
 
