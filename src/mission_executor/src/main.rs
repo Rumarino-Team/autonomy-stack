@@ -7,24 +7,16 @@
 mod missions;
 mod teleop;
 mod navigation;
+mod inotify;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
-
 use arc_swap::ArcSwap;
-use futures::StreamExt;
-use nalgebra::{
-    ArrayStorage, DVector, Isometry3, Matrix1x3, Matrix1x6, Matrix4x3, MatrixXx3, MatrixXx6, Point3, Quaternion, SimdPartialOrd, UnitQuaternion, Vector, Vector3, Vector6, U8
-};
-type Vector8<T> = Vector<T, U8, ArrayStorage<T, 8, 1>>;
 use parry3d_f64::shape::Segment;
-use r2r::{Node, ParameterValue, QosProfile};
-use tokio::sync::Notify;
-use tokio::signal::unix::{signal, SignalKind};
-use tokio::time::timeout;
-use futures::lock::Mutex;
-use notify::Watcher;
+use tokio::sync::{Mutex, Notify};
+use futures::StreamExt;
+use nalgebra::{DVector, Isometry3, MatrixXx6, Point3, Quaternion, UnitQuaternion, Vector3, Vector6};
 
 #[derive(Clone, Copy, Debug)]
 struct Pose {
@@ -54,7 +46,7 @@ impl From<Pose> for Vector6<f64> {
 }
 
 struct MissionExecutor {
-    pub node: Arc<std::sync::Mutex<Node>>,
+    pub node: Arc<Mutex<r2r::Node>>,
     pub map: ArcSwap<MapMsg>,
     pub map_objects_reacted: AtomicUsize,
     pub new_objects: Notify,
@@ -73,19 +65,15 @@ fn wrap_angle(angle: f64) -> f64 {
 }
 
 impl MissionExecutor {
-    pub fn new(node: Node) -> Self {
+    pub fn new(node: r2r::Node) -> Self {
         // hardcoded so it doesn't freak out while it waits for first odometry
         let origin = Pose {
             pos: Vector3::new(-3.0, 1.0, 1.0),
             rot: Quaternion::identity(),
         };
-        let (roll, pitch, yaw) = UnitQuaternion::from_quaternion(origin.rot).euler_angles();
-        let mut goal = Vector6::zeros();
-        goal.fixed_rows_mut::<3>(0).copy_from(&origin.pos);
-        goal.fixed_rows_mut::<3>(3)
-            .copy_from(&Vector3::new(roll, pitch, yaw));
+        let goal = Vector6::from(origin);
         Self {
-            node: Arc::new(std::sync::Mutex::new(node)),
+            node: Arc::new(Mutex::new(node)),
             map: ArcSwap::new(Arc::new(MapMsg::default())),
             map_objects_reacted: AtomicUsize::new(0),
             new_objects: Notify::new(),
@@ -93,7 +81,6 @@ impl MissionExecutor {
             goal: ArcSwap::new(Arc::new(goal)),
             stop: AtomicBool::new(false),
             avg_current: Arc::new(Mutex::new(0.0)),
-            // mission,
         }
     }
 
@@ -240,100 +227,63 @@ fn read_vec6(table: &toml_edit::Table, key: &str) -> Vector6<f64> {
     }
 }
 
-fn load_config(path: &str, auv_name: &str) -> LiveConfig {
-    let content = std::fs::read_to_string(path).unwrap_or_default();
-    let doc = content
-        .parse::<toml_edit::DocumentMut>()
-        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
+fn load_live_config(path: &str, auv_name: &str) -> Option<LiveConfig> {
+    let content = std::fs::read_to_string(path).ok()?;
 
+    let doc = content.parse::<toml_edit::DocumentMut>().ok()?;
 
-    let Some(auv) = doc.get(auv_name).and_then(|v| v.as_table()) else {
-        panic!("couldn't find [{auv_name}] in {path}");
-    };
+    let auv = doc.get(auv_name)?.as_table()?;
 
-    let Some(tam_arr) = auv.get("tam").and_then(|v| v.as_array()) else {
-        panic!("expected tam field in {path}");
-    };
+    let tam_arr = auv.get("tam")?.as_array()?;
+
     let rows = tam_arr.len();
     let mut data = Vec::with_capacity(rows * 6);
 
     for row in tam_arr.iter() {
-        if let Some(row_arr) = row.as_array() {
-            for val in row_arr.iter().take(6) {
-                data.push(val.as_float().unwrap_or(0.0));
-            }
-        } else {
-            data.extend_from_slice(&[0.0; 6]);
+        let Some(row_arr) = row.as_array() else {
+            return None;
+        };
+
+        for val in row_arr.iter().take(6) {
+            data.push(val.as_float().unwrap_or(0.0));
         }
     }
 
     let tam = MatrixXx6::from_row_slice(&data);
 
     let mut pid_map = std::collections::HashMap::new();
+
     if let Some(pids) = auv.get("pid").and_then(|t| t.as_table()) {
         for (name, table) in pids.iter() {
             if let Some(table) = table.as_table() {
-                pid_map.insert(name.to_string(), PidConfig {
-                    kp: read_vec6(table, "kp"),
-                    ki: read_vec6(table, "ki"),
-                    kd: read_vec6(table, "kd"),
-                });
+                pid_map.insert(
+                    name.to_string(),
+                    PidConfig {
+                        kp: read_vec6(table, "kp"),
+                        ki: read_vec6(table, "ki"),
+                        kd: read_vec6(table, "kd"),
+                    },
+                );
             }
         }
     }
 
-    LiveConfig { pid: pid_map, tam }
-}
-
-fn save_config(path: &str, cfg: &LiveConfig) {
-    let mut doc = toml_edit::DocumentMut::new();
-    let mut controllers = toml_edit::Table::new();
-
-    for (name, thing) in &cfg.pid {
-        let mut table = toml_edit::Table::new();
-
-        let mut arr = toml_edit::Array::new();
-        for v in thing.kp.as_slice() {
-            arr.push(*v as f64);
-        }
-        table["kp"] = toml_edit::Item::Value(arr.into());
-
-        let mut arr = toml_edit::Array::new();
-        for v in thing.ki.as_slice() {
-            arr.push(*v as f64);
-        }
-        table["ki"] = toml_edit::Item::Value(arr.into());
-
-        let mut arr = toml_edit::Array::new();
-        for v in thing.kd.as_slice() {
-            arr.push(*v as f64);
-        }
-        table["kd"] = toml_edit::Item::Value(arr.into());
-
-        controllers[name] = toml_edit::Item::Table(table);
-    }
-
-    doc["controllers"] = toml_edit::Item::Table(controllers);
-    std::fs::write(path, doc.to_string()).unwrap();
+    Some(LiveConfig { pid: pid_map, tam })
 }
 
 type MapMsg = r2r::interfaces::msg::Map;
-type MapObjectMsg = r2r::interfaces::msg::MapObject;
-type PointMsg = r2r::geometry_msgs::msg::Point;
-type QuaternionMsg = r2r::geometry_msgs::msg::Quaternion;
-type Vector3Msg = r2r::geometry_msgs::msg::Vector3;
 type OdometryMsg = r2r::nav_msgs::msg::Odometry;
 type Float64MultiArray = r2r::std_msgs::msg::Float64MultiArray;
 
 #[tokio::main]
 async fn main() {
     let ctx = r2r::Context::create().expect("Failed to create r2r context!");
-    let mut node = Node::create(ctx, "mission_executor", "namespace").expect("Failed to get Node!");
+    let mut node = r2r::Node::create(ctx, "mission_executor", "namespace").expect("Failed to get Node!");
     let params = node.params.lock().unwrap();
 
     let mission: Box<dyn Mission> = match params.get("mission_name") {
         Some(r2r::Parameter { value, .. }) => match value {
-            ParameterValue::String(str) => match str.as_str() {
+            r2r::ParameterValue::String(str) => match str.as_str() {
                 "prequalify" => Box::new(missions::PrecualifyMission::new()),
                 "drop_into_box" => Box::new(missions::DropIntoBoxMission::new()),
                 "cardinal_directions" => Box::new(missions::CardinalDirections::new()),
@@ -347,7 +297,7 @@ async fn main() {
 
     let live_config_path = match params.get("live_config_path") {
         Some(r2r::Parameter { value, .. }) => match value {
-            ParameterValue::String(str) => str.to_owned(),
+            r2r::ParameterValue::String(str) => str.to_owned(),
             _ => panic!("live_config_path param must be passed a string"),
         },
         None => panic!("live_config_path param must be passed to mission_executor"),
@@ -356,7 +306,7 @@ async fn main() {
 
     let bridge_name = match params.get("bridge_name") {
         Some(r2r::Parameter { value, .. }) => match value {
-            ParameterValue::String(str) => str.to_owned(),
+            r2r::ParameterValue::String(str) => str.to_owned(),
             _ => panic!("bridge_name param must be passed a string"),
         },
         None => panic!("bridge_name param must be passed to mission_executor"),
@@ -364,7 +314,7 @@ async fn main() {
 
     let auv_name = match params.get("auv_name") {
         Some(r2r::Parameter { value, .. }) => match value {
-            ParameterValue::String(str) => str.to_owned(),
+            r2r::ParameterValue::String(str) => str.to_owned(),
             _ => panic!("auv_name param must be passed a string"),
         },
         None => panic!("auv_name param must be passed to mission_executor"),
@@ -372,15 +322,15 @@ async fn main() {
 
     drop(params);
 
-    let map_qos = QosProfile::default().keep_last(1).transient_local();
+    let map_qos = r2r::QosProfile::default().keep_last(1).transient_local();
     let mut map_sub = node
         .subscribe::<MapMsg>("/vision/map", map_qos)
         .expect("Failed to subscribe to map");
     let mut odometry_sub = node
-        .subscribe::<OdometryMsg>("/bridge/odometry", QosProfile::default())
+        .subscribe::<OdometryMsg>("/bridge/odometry", r2r::QosProfile::default())
         .expect("Failed to subscribe to odometry");
     let thrusters_pub = node
-        .create_publisher::<Float64MultiArray>("/bridge/thrusters", QosProfile::default())
+        .create_publisher::<Float64MultiArray>("/bridge/thrusters", r2r::QosProfile::default())
         .expect("Failed to setup thruster publisher");
 
     let td = Arc::new(MissionExecutor::new(node));
@@ -398,62 +348,22 @@ async fn main() {
         }
     };
 
-    // let path = "./src/mission_executor/live_config.toml";
-    let path_buf = std::fs::canonicalize(&live_config_path).unwrap();
-    r2r::log_info!("config path", "{:?}", path_buf);
+    let cfg = Arc::new(ArcSwap::from_pointee(load_live_config(&live_config_path, &auv_name).unwrap()));
 
-    // Shared atomic ArcSwap
-    let cfg = Arc::new(ArcSwap::from_pointee(load_config(&live_config_path, &auv_name)));
+    let mut inotify_stream = inotify::InotifyStream::new();
+    let live_config_watch_id = inotify_stream.watch(&live_config_path);
 
-    // Notify channel
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(8);
-
-    let watch_path = path_buf.clone();
-    std::thread::spawn(move || {
-        let (notify_tx, notify_rx) = std::sync::mpsc::channel();
-
-        let mut watcher = notify::RecommendedWatcher::new(
-            notify_tx,
-            notify::Config::default()
-                .with_poll_interval(Duration::from_secs(1)),
-        ).expect("failed to create watcher");
-
-        // watch the parent directory instead of the file
-        let parent = watch_path.parent().unwrap();
-
-        watcher
-            .watch(parent, notify::RecursiveMode::NonRecursive)
-            .expect("watch failed");
-
-        println!("watching directory: {:?}", parent);
-
-        
-        for event in notify_rx {
-            if let Ok(ev) = event {
-                match ev.kind {
-                    notify::EventKind::Modify(_) | notify::EventKind::Create(_) => {
-                        if ev.paths.iter().any(|p| p.ends_with(&watch_path)) {
-                            let _ = tx.blocking_send(());
-                        }
-                    }
-                    _ => {} // ignore other events
+    let cfg_clone = cfg.clone();
+    let consume_inotify_stream = || async move {
+        while let Some(id) = inotify_stream.next().await {
+            if id == live_config_watch_id {
+                if let Some(cfg) = load_live_config(&live_config_path, &auv_name) {
+                    cfg_clone.store(Arc::new(cfg));
+                    r2r::log_info!("live_config", "updated");
                 }
             }
         }
-    });
-
-    let cfg_clone = cfg.clone();
-    let path_reload = path_buf.clone();
-    tokio::spawn(async move {
-        while let Some(_) = rx.recv().await {
-            let new_cfg = load_config(path_reload.to_str().unwrap(), &auv_name);
-            r2r::log_info!("", "config change detected {:?}", new_cfg);
-
-            println!("NEW CONFIG: {:?}", new_cfg);
-
-            cfg_clone.store(Arc::new(new_cfg));
-        }
-    });
+    };
 
     const THRUSTOR_SATURATE: f64 = 5.0;
 
@@ -510,7 +420,6 @@ async fn main() {
 
             let unit = UnitQuaternion::from_quaternion(pose.rot);
             let mut rotated = unit.conjugate() * wrench.xyz();
-            let xy_error = wrench.xy().norm();
 
             // only move in xy if aprox looking at goal
             rotated.x = rotated.x.max(0.0);
@@ -530,7 +439,7 @@ async fn main() {
             // r2r::log_info!("thurstor_values", "{thurstor_values:?}");
 
             for val in &mut thurstor_values {
-                *val = val.clamp(-5.0, 5.0);
+                *val = val.clamp(-THRUSTOR_SATURATE, THRUSTOR_SATURATE);
                  *val /= 5.0;
             }
             let mut thrusters_msg = Float64MultiArray::default();
@@ -604,6 +513,7 @@ async fn main() {
         }
     };
 
+    tokio::spawn(consume_inotify_stream());
     tokio::spawn(consume_map_sub(Arc::clone(&td)));
     tokio::spawn(consume_odometry_sub(Arc::clone(&td)));
     tokio::spawn(consume_new_objects(Arc::clone(&td)));
@@ -611,7 +521,7 @@ async fn main() {
 
     r2r::log_info!("", "start spinning!");
     while !td.stop.load(Ordering::Relaxed) {
-        let mut node_lock = td.node.lock().unwrap();
+        let mut node_lock = td.node.lock().await;
         node_lock.spin_once(Duration::from_millis(100));
         drop(node_lock);
     }
