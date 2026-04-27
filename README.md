@@ -78,16 +78,22 @@ sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o
 sudo apt update
 sudo apt install -y ros-jazzy-desktop \
     ros-jazzy-vision-msgs \
+  ros-jazzy-sensor-msgs \
+  ros-jazzy-geometry-msgs \
+  ros-jazzy-rviz2 \
+  ros-jazzy-usb-cam \
     libfreetype6-dev \
     libsdl2-dev \
     libglm-dev \
     libeigen3-dev \
-    libogre-1.9-dev \
+  libogre-1.12-dev \
     libopencv-dev \
     libssl-dev \
     libboost-all-dev \
     libepoxy-dev \
     libtinyxml2-dev \
+  ros-jazzy-pangolin \
+    socat \
     pkg-config
 ```
 
@@ -158,6 +164,63 @@ ros2 launch orb_slam3_ros2 orb_slam_sim_launch.py \
 #### Notes
 * The artifact bundle is built for Jetson-compatible Ubuntu 22.04 / ROS Humble ABI levels.
 
+## Kalibr (Camera + IMU calibration)
+
+Use the repository Kalibr wrapper in `tools/kalibr` to calibrate camera intrinsics and camera-IMU extrinsics.
+
+### 1) Prepare tools
+```sh
+docker pull stereolabs/kalibr:latest
+chmod +x tools/kalibr/run_kalibr.sh
+chmod +x tools/kalibr/extract_orbslam_tbc.py
+```
+
+### 2) Record calibration bags
+```sh
+# Camera intrinsics bag
+ros2 bag record /usb_cam/image_raw -o bags/cam_intrinsics
+# Camera + IMU bag for extrinsics
+ros2 bag record /usb_cam/image_raw /vectornav/imu -o bags/imucam
+```
+
+### 3) Calibrate camera intrinsics
+```sh
+bash tools/kalibr/run_kalibr.sh kalibr_calibrate_cameras \
+  --bag /work/bags/cam_intrinsics.bag \
+  --topics /usb_cam/image_raw \
+  --models pinhole-radtan \
+  --target /work/tools/kalibr/config/aprilgrid_6x6_80x30.yaml
+```
+
+Output: `camchain-cam_intrinsics.yaml`
+
+### 4) Prepare IMU noise config
+Edit `tools/kalibr/config/imu.yaml` and fill real Allan-variance noise values.
+
+### 5) Calibrate camera-IMU extrinsics
+```sh
+bash tools/kalibr/run_kalibr.sh kalibr_calibrate_imu_camera \
+  --bag /work/bags/imucam.bag \
+  --cam /work/camchain-cam_intrinsics.yaml \
+  --imu /work/tools/kalibr/config/imu.yaml \
+  --target /work/tools/kalibr/config/aprilgrid_6x6_80x30.yaml
+```
+
+Output: `camchain-imucam.yaml`
+
+### 6) Get ORB-SLAM calibration matrix
+```sh
+python3 tools/kalibr/extract_orbslam_tbc.py camchain-imucam.yaml
+```
+
+Copy the printed matrix into both keys in `src/orb_slam3_ros2/config/webcamera.yaml`:
+- `IMU.T_b_c1`
+- `Tbc`
+
+### Notes
+- If Kalibr cannot read your ROS 2 bag directly, convert it to ROS1 bag format first.
+- Ensure the topic names passed to Kalibr exactly match your recorded bag topics.
+
 
 
 
@@ -177,7 +240,6 @@ source install/setup.bash
 ## Simulate Missions using bridge_stonefish
 ```sh
 # Note:
-# - `auv_name` is now the single source of truth for AUV selection.
 # - For `env_file_name:=pool_env.scn`, the launch script auto-selects the
 #   matching pool scenario wrapper for the chosen AUV.
 # - `auv_file_name` is optional and only needed as a manual override.
@@ -222,44 +284,78 @@ ros2 launch bringup stonefish.launch.py \
   headless:=false
 ```
 
-## Test using bridge_stonefish
-```sh
-# TODO
-```
 
 ## Build & Run proteus using bridge_hardware
+
+### Build
 ```sh
 # Source ROS 2 environment
 source /opt/ros/jazzy/setup.bash
 
-# Build packages (TODO: remember about detections stuff)
-# VectorNav is vendored as a submodule under vendor/vectornav on the ros2 branch.
+# Build packages
 colcon build \
   --packages-select interfaces bringup mission_executor bridge_hardware vectornav vectornav_msgs \
-    --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+```
 
-# Optional: disable VN-100 support at compile time
-# (default is enabled)
-colcon build \
-  --packages-select bridge_hardware \
-  --cmake-args -DBRIDGE_HARDWARE_ENABLE_VN100=OFF
-
-# Optional: explicitly enable VN-100 support
-colcon build \
-  --packages-select bridge_hardware \
-  --cmake-args -DBRIDGE_HARDWARE_ENABLE_VN100=ON
-
-# When using hardware_proteus.launch.py, build bridge_hardware with VN-100 off
-# because the IMU is started by the vectornav package launch file.
-
-# Source the workspace
+### Run with real Arduino
+```sh
+# Source workspace after build
 source install/setup.bash
 
-# Run
+# Launch full hardware stack
 ros2 launch bringup hardware_proteus.launch.py \
-    mission_name:=prequalify \
-    arduino_port:=/dev/ttyACM0 arduino_baud_rate:=115200
+  mission_name:=prequalify \
+  arduino_port:=/dev/ttyACM0 \
+  arduino_baud_rate:=115200
 
-# VectorNav is started by bringup/hardware_proteus.launch.py and reads port/baud
-# from vendor/vectornav/vectornav/config/vectornav.yaml.
+# Or run bridge node directly
+ros2 run bridge_hardware bridge_proteus_node --ros-args \
+  -p arduino_port:=/dev/ttyACM0 \
+  -p arduino_baud_rate:=115200
+```
+
+
+### Arduino CLI (real board)
+
+#### 1. Install AVR board support and Servo library dependency
+```sh
+arduino-cli core update-index
+arduino-cli core install arduino:avr
+arduino-cli lib install Servo
+```
+#### 2. Compile and upload Proteus firmware
+```sh
+arduino-cli compile --fqbn arduino:avr:uno arduino/sketches/Proteus
+arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:uno arduino/sketches/Proteus
+```
+
+### Mock Arduino test
+
+#### 1. Create connected virtual serial ports
+```sh
+rm -f /tmp/ttyMOCK /tmp/ttyBRIDGE /tmp/socat_pair.log
+socat -d -d \
+  pty,raw,echo=0,link=/tmp/ttyMOCK \
+  pty,raw,echo=0,link=/tmp/ttyBRIDGE \
+  2>&1 | tee /tmp/socat_pair.log
+```
+
+#### 2. Start mock Arduino (new terminal)
+```sh
+python3 tools/mock_arduino.py /tmp/ttyMOCK 115200
+```
+
+#### 3. Start bridge_hardware with virtual bridge port (new terminal)
+```sh
+source install/setup.bash
+ros2 run bridge_hardware bridge_proteus_node --ros-args \
+  -p arduino_port:=/tmp/ttyBRIDGE \
+  -p arduino_baud_rate:=115200
+```
+
+#### 4. Publish thruster commands (new terminal)
+```sh
+source install/setup.bash
+ros2 topic pub -r 10 /bridge/thrusters std_msgs/msg/Float64MultiArray "{data: [0.45, -0.25, 0.15, -0.15, 0.05, -0.05]}"
 ```

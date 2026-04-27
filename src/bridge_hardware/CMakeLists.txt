@@ -6,15 +6,11 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
 
-# Feature flags
-option(BRIDGE_HARDWARE_ENABLE_VN100 "Enable VN-100 IMU support" ON)
-
 # Find ROS 2 packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
 find_package(glm REQUIRED)
 
 # Include headers
@@ -26,13 +22,7 @@ ament_target_dependencies(bridge_proteus_node
   rclcpp
   std_msgs
   nav_msgs
-  sensor_msgs
 )
-
-# Add compile definitions based on feature flags
-if(BRIDGE_HARDWARE_ENABLE_VN100)
-  target_compile_definitions(bridge_proteus_node PRIVATE BRIDGE_HARDWARE_ENABLE_VN100)
-endif()
 
 # Install the executable
 install(TARGETS

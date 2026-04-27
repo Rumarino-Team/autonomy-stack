@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <Servo.h>
 
+#define PULSE_WIDTH_MIN 1400
+#define PULSE_WIDTH_MAX 1600
 #define PULSE_WIDTH_NEUTRAL 1500
 // original delta
 // #define PULSE_WIDTH_DELTA 400
@@ -90,8 +92,8 @@ void processSerialCommands() {
     Serial.print("pulse_width = ");
     Serial.println(pulse_width);
 
-    if (PINS[thruster_index] == -1) {
-      Serial.println("Invalid thruster");
+    if (pin_index == -1) {
+      Serial.println("Invalid Pin");
     } else {
       servos[thruster_index].writeMicroseconds(pulse_width);
     }
