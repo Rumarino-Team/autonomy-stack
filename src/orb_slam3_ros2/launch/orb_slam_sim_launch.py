@@ -47,7 +47,7 @@ def generate_launch_description():
     
     # Load ORB-SLAM3 settings
     default_settings_file = os.path.join(orb_slam_share, "config", "stonefish_hydrus.yaml")
-    vocabulary_file = "/home/cesar/autonomy-stack/vendor/ORBvoc.txt"
+    vocabulary_file = os.path.join(orb_slam_share, "vendor", "ORBvoc.txt")
     
     return LaunchDescription([
         # Launch arguments

@@ -148,6 +148,13 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config")
   )
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/ORBvoc.txt")
+  install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/ORBvoc.txt
+    DESTINATION share/${PROJECT_NAME}/vendor
+  )
+endif()
+
 # ==============================
 #  Package export for ament
 # ==============================
