@@ -9,6 +9,7 @@ mod teleop;
 mod navigation;
 mod inotify;
 
+use std::ops::Bound;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
@@ -19,11 +20,19 @@ use futures::StreamExt;
 use nalgebra::{DVector, Isometry3, MatrixXx6, Point3, Quaternion, UnitQuaternion, Vector3, Vector6};
 
 #[derive(Clone, Copy, Debug)]
-struct Pose {
+pub struct Pose {
     pos: Vector3<f64>,
     rot: Quaternion<f64>,
 }
 
+impl Pose {
+    fn new(pos: Vector3<f64>, rot: Quaternion<f64>) -> Pose {
+        Pose {
+            pos,
+            rot
+        }
+    }
+}
 impl From<&r2r::geometry_msgs::msg::Pose> for Pose {
     fn from(value: &r2r::geometry_msgs::msg::Pose) -> Self {
         let p = &value.position;
@@ -174,6 +183,15 @@ pub struct MapObject {
     cls: ObjectCls,
     bbox: BoundingBox3D,
     can_collide: bool,
+}
+
+impl BoundingBox3D {
+    pub fn new(center: Pose, size: Vector3<f64>) -> BoundingBox3D {
+        BoundingBox3D {
+            center,
+            size
+        }
+    }
 }
 
 impl From<&r2r::vision_msgs::msg::BoundingBox3D> for BoundingBox3D {
