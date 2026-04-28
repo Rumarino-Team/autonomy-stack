@@ -10,6 +10,10 @@
 [submodule "vendor/depth_anything_v2"]
 	path = vendor/depth_anything_v2
 	url = https://github.com/DepthAnything/Depth-Anything-V2.git
+[submodule "vendor/vectornav"]
+	path = vendor/vectornav
+	url = https://github.com/dawonn/vectornav.git
+	branch = ros2
 [submodule "vendor/joystick_drivers"]
 	path = vendor/joystick_drivers
 	url = https://github.com/ros-drivers/joystick_drivers.git

@@ -1,9 +1,16 @@
 #include <Arduino.h>
 #include <Servo.h>
 
-#define PULSE_WIDTH_MIN 1100
-#define PULSE_WIDTH_MAX 1900
+#define PULSE_WIDTH_MIN 1400
+#define PULSE_WIDTH_MAX 1600
 #define PULSE_WIDTH_NEUTRAL 1500
+// original delta
+// #define PULSE_WIDTH_DELTA 400
+
+// reduced delta
+#define PULSE_WIDTH_DELTA 100
+#define PULSE_WIDTH_MIN PULSE_WIDTH_NEUTRAL - PULSE_WIDTH_DELTA
+#define PULSE_WIDTH_MAX PULSE_WIDTH_NEUTRAL + PULSE_WIDTH_DELTA
 #define PINS_COUNT 6
 
 const int PINS[PINS_COUNT] = {7, 6, 3, 2, 4, 5};
@@ -65,7 +72,10 @@ void processSerialCommands() {
   switch (cmd_type) {
   case 'T': {
     int value = inputString.substring(colon_pos + 1).toFloat();
-    float pulse_width = 1500 + 400 * value;
+    // original from 1100 to 1900
+    // float pulse_width = 1500 + 400 * value;
+
+    float pulse_width = PULSE_WIDTH_NEUTRAL + PULSE_WIDTH_DELTA * value;
 
     if (pulse_width < PULSE_WIDTH_MIN) {
       pulse_width = PULSE_WIDTH_MIN;

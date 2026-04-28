@@ -1,0 +1,8 @@
+rostopic: /vectornav/imu
+update_rate: 20.0
+
+# Replace with Allan-variance-derived constants for production use.
+accelerometer_noise_density: 0.0020
+accelerometer_random_walk: 0.0030
+gyroscope_noise_density: 0.00017
+gyroscope_random_walk: 0.000019

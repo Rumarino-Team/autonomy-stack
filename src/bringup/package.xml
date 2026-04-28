@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
   <exec_depend>vectornav</exec_depend>
 
   <test_depend>ament_copyright</test_depend>

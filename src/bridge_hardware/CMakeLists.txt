@@ -11,7 +11,6 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
 find_package(glm REQUIRED)
 
 # Include headers
@@ -23,7 +22,6 @@ ament_target_dependencies(bridge_proteus_node
   rclcpp
   std_msgs
   nav_msgs
-  sensor_msgs
 )
 
 # Install the executable
