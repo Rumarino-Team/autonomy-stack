@@ -44,6 +44,10 @@ def _launch_setup(context, *args, **kwargs):
     if env_file_name == 'pool_env.scn':
         resolved_env_file_name = POOL_ENV_SCENARIO_BY_AUV.get(auv_name, f'pool_env_{auv_name}.scn')
     scenario_desc_path = os.path.join(bridge_share, 'data', 'scenarios', resolved_env_file_name)
+    detection_env_file_name = env_file_name
+    if resolved_env_file_name in POOL_ENV_SCENARIO_BY_AUV.values():
+        detection_env_file_name = 'pool_env.scn'
+    detection_scn_path = os.path.join(bridge_share, 'data', 'scenarios', detection_env_file_name)
 
     simulator_launch = 'stonefish_simulator_nogpu.launch.py' if headless else 'stonefish_simulator.launch.py'
     simulator_arguments = {
@@ -89,8 +93,9 @@ def _launch_setup(context, *args, **kwargs):
             package='detection_mocker',
             executable='detection_mocker',
             parameters=[{
-                'scn_file_path': scenario_desc_path,
+                'scn_file_path': detection_scn_path,
                 'robot_scn_file_path': auv_file_path,
+                'mesh_base_path': os.path.join(bridge_share, 'data'),
                 'odometry_topic': '/vision/odometry',
                 'map_output_topic': '/vision/map',
                 'publish_all_objects': True,
@@ -127,6 +132,7 @@ def generate_launch_description():
     env_file_name_arg = DeclareLaunchArgument('env_file_name')
     auv_file_name_arg = DeclareLaunchArgument('auv_file_name', default_value='')
     headless_arg = DeclareLaunchArgument('headless', default_value='false')
+    stonefish_only_arg = DeclareLaunchArgument('stonefish_only', default_value='false')
 
     return LaunchDescription([
         mission_name_arg,
@@ -134,5 +140,6 @@ def generate_launch_description():
         env_file_name_arg,
         auv_file_name_arg,
         headless_arg,
+        stonefish_only_arg,
         OpaqueFunction(function=_launch_setup),
     ])

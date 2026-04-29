@@ -77,7 +77,7 @@ impl MissionExecutor {
     pub fn new(node: r2r::Node) -> Self {
         // hardcoded so it doesn't freak out while it waits for first odometry
         let origin = Pose {
-            pos: Vector3::new(-3.0, 1.0, 1.0),
+            pos: Vector3::new(3.0, 1.0, 1.0),
             rot: Quaternion::identity(),
         };
         let goal = Vector6::from(origin);

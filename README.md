@@ -282,6 +282,25 @@ ros2 launch bringup stonefish.launch.py \
   env_file_name:=pool_env.scn \
   auv_file_name:=bluerov2.scn \
   headless:=false
+
+# bluerov2 direct actuator sanity test
+# Use stonefish_only so mission_executor does not overwrite the direct command.
+ros2 launch bringup stonefish.launch.py \
+  mission_name:=teleop \
+  auv_name:=bluerov2 \
+  env_file_name:=pool_env.scn \
+  headless:=false \
+  stonefish_only:=true
+
+# In another terminal, publish 8 normalized thruster values.
+source install/setup.bash
+
+# Equal horizontal commands cancel on this angled layout; this pattern drives body +X.
+ros2 topic pub -r 10 /bridge/thrusters std_msgs/msg/Float64MultiArray \
+  "{data: [-0.6, -0.6, 0.6, 0.6, 0.0, 0.0, 0.0, 0.0]}"
+
+# Watch Stonefish's actuator feedback.
+ros2 topic echo /bridge/thruster_state
 ```
 
 

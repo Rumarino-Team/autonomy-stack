@@ -138,26 +138,26 @@
 		</base_link>
 
 		<ros_subscriber thrusters="/bridge/thrusters" />
+		<ros_publisher thrusters="/bridge/thruster_state" />
 		
 		<!-- Thruster 1 -->
+		<!-- Tuned for about 50 N static thrust at full normalized command in pool water. -->
 		<actuator name="FrontRight" type="thruster">
 			<link name="base_link"/>
 			<origin xyz="0.1355 0.1 0.0725" rpy="0 0 -0.7853981634"/>
-			<specs max_setpoint="${3600.0/60.0*2.0*pi}" inverted_setpoint="true"
+			<specs max_setpoint="${4000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.076" right="true">
 				<mesh filename="bluerov2/ccw.obj" scale="1.0"/>
 				<material name="Neutral"/>
 				<look name="blue"/>
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.2" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.167" reverse="0.167" />
-				<torque_coeff value="0.016" />
+				<thrust_coeff forward="0.334" reverse="0.334" />
+				<torque_coeff value="0.032" />
 			</thrust_model>
 		</actuator>
 
@@ -165,21 +165,19 @@
 		<actuator name="FrontLeft" type="thruster">
 			<link name="base_link"/>
 			<origin xyz="0.1355 -0.1 0.0725" rpy="0 0 0.7853981634"/>
-			<specs max_setpoint="${3600.0/60.0*2.0*pi}" inverted_setpoint="true"
+			<specs max_setpoint="${4000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.076" right="true">
 				<mesh filename="bluerov2/ccw.obj" scale="1.0"/>
 				<material name="Neutral"/>
 				<look name="blue"/>
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.2" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.167" reverse="0.167" />
-				<torque_coeff value="0.016" />
+				<thrust_coeff forward="0.334" reverse="0.334" />
+				<torque_coeff value="0.032" />
 			</thrust_model>
 		</actuator>
 
@@ -187,21 +185,19 @@
 		<actuator name="BackRight" type="thruster">
 			<link name="base_link"/>
 			<origin xyz="-0.1475 0.1 0.0725" rpy="0 0 -2.3561944902"/>
-			<specs max_setpoint="${3600.0/60.0*2.0*pi}" inverted_setpoint="false"
+			<specs max_setpoint="${4000.0/60.0*2.0*pi}" inverted_setpoint="false"
 				normalized_setpoint="true" />
 			<propeller diameter="0.076" right="false">
 				<mesh filename="bluerov2/cw.obj" scale="1.0"/>
 				<material name="Neutral"/>
 				<look name="blue"/>
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.2" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.167" reverse="0.167" />
-				<torque_coeff value="0.016" />
+				<thrust_coeff forward="0.334" reverse="0.334" />
+				<torque_coeff value="0.032" />
 			</thrust_model>
 		</actuator>
 
@@ -209,21 +205,19 @@
 		<actuator name="BackLeft" type="thruster">
 			<link name="base_link"/>
 			<origin xyz="-0.1475 -0.1 0.0725" rpy="0 0 2.3561944902"/>
-			<specs max_setpoint="${3600.0/60.0*2.0*pi}" inverted_setpoint="false"
+			<specs max_setpoint="${4000.0/60.0*2.0*pi}" inverted_setpoint="false"
 				normalized_setpoint="true" />
 			<propeller diameter="0.076" right="false">
 				<mesh filename="bluerov2/cw.obj" scale="1.0"/>
 				<material name="Neutral"/>
 				<look name="blue"/>
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.2" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.167" reverse="0.167" />
-				<torque_coeff value="0.016" />
+				<thrust_coeff forward="0.334" reverse="0.334" />
+				<torque_coeff value="0.032" />
 			</thrust_model>
 		</actuator>
 
@@ -231,21 +225,19 @@
 		<actuator name="DiveFrontRight" type="thruster">
 			<link name="base_link"/>
 			<origin xyz="0.12 0.218 0.0" rpy="0 -1.5707963268 0"/>
-			<specs max_setpoint="${3600.0/60.0*2.0*pi}" inverted_setpoint="false"
+			<specs max_setpoint="${4000.0/60.0*2.0*pi}" inverted_setpoint="false"
 				normalized_setpoint="true" />
 			<propeller diameter="0.076" right="true">
 				<mesh filename="bluerov2/cw.obj" scale="1.0"/>
 				<material name="Neutral"/>
 				<look name="blue"/>
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.2" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.167" reverse="0.167" />
-				<torque_coeff value="0.016" />
+				<thrust_coeff forward="0.334" reverse="0.334" />
+				<torque_coeff value="0.032" />
 			</thrust_model>
 		</actuator>
 
@@ -253,21 +245,19 @@
 		<actuator name="DiveFrontLeft" type="thruster">
 			<link name="base_link"/>
 			<origin xyz="0.12 -0.218 0.0" rpy="0 -1.5707963268 0"/>
-			<specs max_setpoint="${3600.0/60.0*2.0*pi}" inverted_setpoint="true"
+			<specs max_setpoint="${4000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.076" right="false">
 				<mesh filename="bluerov2/ccw.obj" scale="1.0"/>
 				<material name="Neutral"/>
 				<look name="blue"/>
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.2" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.167" reverse="0.167" />
-				<torque_coeff value="0.016" />
+				<thrust_coeff forward="0.334" reverse="0.334" />
+				<torque_coeff value="0.032" />
 			</thrust_model>
 		</actuator>
 		
@@ -275,21 +265,19 @@
 		<actuator name="DiveBackRight" type="thruster">
 			<link name="base_link"/>
 			<origin xyz="-0.12 0.218 0.0" rpy="0 -1.5707963268 0"/>
-			<specs max_setpoint="${3600.0/60.0*2.0*pi}" inverted_setpoint="true"
+			<specs max_setpoint="${4000.0/60.0*2.0*pi}" inverted_setpoint="true"
 				normalized_setpoint="true" />
 			<propeller diameter="0.076" right="false">
 				<mesh filename="bluerov2/ccw.obj" scale="1.0"/>
 				<material name="Neutral"/>
 				<look name="blue"/>
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.2" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.167" reverse="0.167" />
-				<torque_coeff value="0.016" />
+				<thrust_coeff forward="0.334" reverse="0.334" />
+				<torque_coeff value="0.032" />
 			</thrust_model>
 		</actuator>
 
@@ -297,21 +285,19 @@
 		<actuator name="DiveBackLeft" type="thruster">
 			<link name="base_link"/>
 			<origin xyz="-0.12 -0.218 0.0" rpy="0 -1.5707963268 0"/>
-			<specs max_setpoint="${3600.0/60.0*2.0*pi}" inverted_setpoint="false"
+			<specs max_setpoint="${4000.0/60.0*2.0*pi}" inverted_setpoint="false"
 				normalized_setpoint="true" />
 			<propeller diameter="0.076" right="true">
 				<mesh filename="bluerov2/cw.obj" scale="1.0"/>
 				<material name="Neutral"/>
 				<look name="blue"/>
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.2" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
-				<thrust_coeff forward="0.167" reverse="0.167" />
-				<torque_coeff value="0.016" />
+				<thrust_coeff forward="0.334" reverse="0.334" />
+				<torque_coeff value="0.032" />
 			</thrust_model>
 		</actuator>
 
@@ -439,7 +425,5 @@
 
 		<world_transform xyz="$(arg position)" rpy="$(arg orientation)"/>
 		
-		<!-- <ros_subscriber thrusters="/bridge/thrusters"/> -->
-		<!-- <ros_publisher thrusters="/$(arg vehicle_name)/thruster_state"/> -->
 	</robot>
 </scenario>
