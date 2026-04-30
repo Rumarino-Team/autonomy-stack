@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 80" role="img" aria-labelledby="title desc">
+  <title id="title">Autonomy Stack logo placeholder</title>
+  <desc id="desc">A simple placeholder logo for the autonomy stack documentation.</desc>
+  <rect width="180" height="80" rx="8" fill="#016A91"/>
+  <path d="M28 43c18-18 43-18 61 0s43 18 61 0" fill="none" stroke="#D8F3F8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M54 33h42l18 10-18 10H54l-10-10z" fill="#F8FBFC"/>
+  <circle cx="66" cy="43" r="4" fill="#016A91"/>
+  <text x="90" y="69" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#F8FBFC">AUTONOMY STACK</text>
+</svg>

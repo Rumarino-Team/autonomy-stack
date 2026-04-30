@@ -108,6 +108,29 @@ sudo make install
 cd ../../../../../
 ```
 
+## Build the Documentation
+
+The documentation is built with Sphinx from the `docs/` directory. The docs
+also use Mermaid diagrams, so install the documentation requirements before
+building.
+
+```sh
+# From the repository root
+python3 -m venv .venv-docs
+source .venv-docs/bin/activate
+
+python3 -m pip install --upgrade pip
+python3 -m pip install -r docs/requirements.txt
+
+make -C docs html
+```
+
+The generated HTML site will be available at:
+
+```sh
+docs/_build/html/index.html
+```
+
 ## Computer Vision
 
 ### ZED Custom Wrapper

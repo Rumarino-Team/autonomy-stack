@@ -27,3 +27,8 @@ __pycache__/
 *.pyc
 
 
+docs/.venv-docs
+docs/_build
+docs/_static
+docs/_templates
+vendor/ORBvoc.txt
