@@ -38,7 +38,14 @@ master_doc = "index"
 root_doc = "index"
 language = "en"
 
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    ".venv-docs",
+    ".venv-docs/**",
+    "**/.venv-docs/**",
+]
 pygments_style = None
 
 todo_include_todos = True

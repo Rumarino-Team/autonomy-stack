@@ -41,3 +41,12 @@ Troubleshooting
 .. todo::
 
    Add frequent build, launch, simulator, camera, and mission executor issues.
+
+
+Advanced
+========
+
+.. toctree::
+   :maxdepth: 1
+
+   architecture
