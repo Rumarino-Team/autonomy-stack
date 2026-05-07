@@ -6,6 +6,10 @@ use parry3d_f64::shape::{Cuboid, Segment};
 //TODO: Idk if you guys want to set this in the configuration of each submarine
 const SUB_EXTENTS: Matrix3x1<f64> = Matrix3x1::new(0.5, 0.5, 0.5);
 
+const MIN_CUBOID_DIST: f64 = 3.0; // The minimum value in which the contact point is used directly
+const MAX_AXIS_DIFF: f64 = 7.0; // The maximum distance in which a straight line is allowed
+const AXIS_MULT: f64 = 0.1; // Rate in which the point is translated to the submarine point
+
 pub fn get_new_point(
     bbox: &BoundingBox3D,
     cuboid_pos: &Isometry3<f64>,
@@ -39,7 +43,10 @@ pub fn get_new_point(
 
     let dist_to_cuboid = segment.a.coords.metric_distance(&contact.point1.coords);
 
-    let safe_base_point = if dist_to_cuboid < 3.0 {
+    // This is to handle corner cases where the submarine is too close to the object in between.
+    // The closer the object is the more the base point gets translated to be in the same axis 
+    // as the submarine.
+    let safe_base_point = if dist_to_cuboid < MIN_CUBOID_DIST {
         contact.point1.coords - seg_dir.into_inner() * dist_to_cuboid
     } else {
         contact.point1.coords
@@ -114,8 +121,8 @@ fn get_points(
         // the submarine to make a straight line and potentially collide with the object in the path to 
         // the point. So, if this happens we'll translate the point to be nearer to the colliding axis.
         let axis_diff = (point[axis] - sub_pos[axis]);
-        if axis_diff.abs() > 7.0 {
-            point[colliding_axis] -= axis_diff * 0.1;
+        if axis_diff.abs() > MAX_AXIS_DIFF {
+            point[colliding_axis] -= axis_diff * AXIS_MULT;
         }
 
         // Round the numbers by two decimal places. It makes it look nicer and easier to test
