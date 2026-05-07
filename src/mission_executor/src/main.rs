@@ -4,20 +4,23 @@
 //! A `Mission` is a scenario where the submarine must react to diferent `ObjectCls` with their
 //! respective sequences of actions.
 
-mod missions;
-mod teleop;
-mod navigation;
 mod inotify;
+mod missions;
+mod navigation;
+mod teleop;
 
+use arc_swap::ArcSwap;
+use futures::StreamExt;
+use nalgebra::{
+    DVector, Isometry3, MatrixXx6, Point3, Quaternion, UnitQuaternion, Vector3, Vector6,
+};
+use parry3d_f64::shape::Segment;
 use std::ops::Bound;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
-use arc_swap::ArcSwap;
-use parry3d_f64::shape::Segment;
 use tokio::sync::{Mutex, Notify};
-use futures::StreamExt;
-use nalgebra::{DVector, Isometry3, MatrixXx6, Point3, Quaternion, UnitQuaternion, Vector3, Vector6};
+use tokio::time::MissedTickBehavior;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Pose {
@@ -27,10 +30,7 @@ pub struct Pose {
 
 impl Pose {
     fn new(pos: Vector3<f64>, rot: Quaternion<f64>) -> Pose {
-        Pose {
-            pos,
-            rot
-        }
+        Pose { pos, rot }
     }
 }
 impl From<&r2r::geometry_msgs::msg::Pose> for Pose {
@@ -101,15 +101,16 @@ impl MissionExecutor {
         old_goal.y = dest.y;
         old_goal.z = dest.z;
         self.goal.store(Arc::new(old_goal));
+        let mut poll_interval = tokio::time::interval(Duration::from_millis(100));
+        poll_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
         while !self.stop.load(Ordering::Relaxed) {
+            poll_interval.tick().await;
             let pose = self.pose.load();
             let goal = self.goal.load();
             let dist = pose.pos.metric_distance(&dest);
             r2r::log_info!("dist", "{dist}, pose: {pose:?}, goal: {goal:?}");
             if dist < CLOSE_ENOUGH {
                 break;
-            } else {
-                tokio::time::sleep(Duration::from_millis(100)).await;
             }
         }
     }
@@ -158,7 +159,7 @@ impl MissionExecutor {
 
         for point in dest {
             self.move_to(point.coords).await;
-            std::thread::sleep(Duration::from_millis(500));
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
 }
@@ -187,10 +188,7 @@ pub struct MapObject {
 
 impl BoundingBox3D {
     pub fn new(center: Pose, size: Vector3<f64>) -> BoundingBox3D {
-        BoundingBox3D {
-            center,
-            size
-        }
+        BoundingBox3D { center, size }
     }
 }
 
@@ -296,7 +294,8 @@ type Float64MultiArray = r2r::std_msgs::msg::Float64MultiArray;
 #[tokio::main]
 async fn main() {
     let ctx = r2r::Context::create().expect("Failed to create r2r context!");
-    let mut node = r2r::Node::create(ctx, "mission_executor", "namespace").expect("Failed to get Node!");
+    let mut node =
+        r2r::Node::create(ctx, "mission_executor", "namespace").expect("Failed to get Node!");
     let params = node.params.lock().unwrap();
 
     let mission: Box<dyn Mission> = match params.get("mission_name") {
@@ -338,6 +337,26 @@ async fn main() {
         None => panic!("auv_name param must be passed to mission_executor"),
     };
 
+    let spin_once_ms = match params.get("spin_once_ms") {
+        Some(r2r::Parameter { value, .. }) => match value {
+            r2r::ParameterValue::Integer(ms) if *ms > 0 => *ms as u64,
+            _ => panic!("spin_once_ms param must be passed as a positive integer"),
+        },
+        None => 500,
+    };
+
+    let thruster_loop_ms = match params.get("thruster_loop_ms") {
+        Some(r2r::Parameter { value, .. }) => match value {
+            r2r::ParameterValue::Integer(ms) if *ms > 0 => *ms as u64,
+            _ => panic!("thruster_loop_ms param must be passed as a positive integer"),
+        },
+        None => 100,
+    };
+    r2r::log_info!(
+        "timing",
+        "spin_once_ms={spin_once_ms}, thruster_loop_ms={thruster_loop_ms}"
+    );
+
     drop(params);
 
     let map_qos = r2r::QosProfile::default().keep_last(1).transient_local();
@@ -366,7 +385,9 @@ async fn main() {
         }
     };
 
-    let cfg = Arc::new(ArcSwap::from_pointee(load_live_config(&live_config_path, &auv_name).unwrap()));
+    let cfg = Arc::new(ArcSwap::from_pointee(
+        load_live_config(&live_config_path, &auv_name).unwrap(),
+    ));
 
     let mut inotify_stream = inotify::InotifyStream::new();
     let live_config_watch_id = inotify_stream.watch(&live_config_path);
@@ -385,7 +406,11 @@ async fn main() {
 
     const THRUSTOR_SATURATE: f64 = 5.0;
 
+    let thruster_loop_period = Duration::from_millis(thruster_loop_ms);
+
     let go_to_goal = |td: Arc<MissionExecutor>| async move {
+        let mut thruster_interval = tokio::time::interval(thruster_loop_period);
+        thruster_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
         let mut sum_err = Vector6::zeros();
         let mut prev_pose_err = Vector6::zeros();
         let mut prev_now = Instant::now();
@@ -393,6 +418,8 @@ async fn main() {
         let log_interval = Duration::from_millis(500);
         let mut last_log = Instant::now();
         while !td.stop.load(Ordering::Relaxed) {
+            thruster_interval.tick().await;
+
             let current_cfg = cfg.load();
             let PidConfig { kp, ki, kd } = current_cfg.pid[&bridge_name];
             let tam_x_y_z_roll_pitch_yaw = &current_cfg.tam;
@@ -416,7 +443,7 @@ async fn main() {
             let dir = Vector3::new(pose_err[0], pose_err[1], 0.0);
             let yaw_error = if dir.norm() > CLOSE_ENOUGH {
                 let dir = dir.normalize();
-                
+
                 // rotation from current forward → target direction
                 let yaw_quat = UnitQuaternion::rotation_between(&forward, &dir)
                     .unwrap_or(UnitQuaternion::identity());
@@ -446,19 +473,21 @@ async fn main() {
                 rotated.x = 0.0;
                 rotated.y = 0.0;
             }
-            let input_x_y_z_roll_pitch_yaw
-                = Vector6::new(rotated.x, rotated.y, wrench.z, -wrench[3], wrench[4], wrench[5]);
+            let input_x_y_z_roll_pitch_yaw = Vector6::new(
+                rotated.x, rotated.y, wrench.z, -wrench[3], wrench[4], wrench[5],
+            );
 
             // r2r::log_info!("wrench", "{wrench:?}");
             // r2r::log_info!("rotated", "{rotated:?}");
 
-            let mut thurstor_values: DVector<f64> = tam_x_y_z_roll_pitch_yaw * input_x_y_z_roll_pitch_yaw;
+            let mut thurstor_values: DVector<f64> =
+                tam_x_y_z_roll_pitch_yaw * input_x_y_z_roll_pitch_yaw;
 
             // r2r::log_info!("thurstor_values", "{thurstor_values:?}");
 
             for val in &mut thurstor_values {
                 *val = val.clamp(-THRUSTOR_SATURATE, THRUSTOR_SATURATE);
-                 *val /= 5.0;
+                *val /= 5.0;
             }
             let mut thrusters_msg = Float64MultiArray::default();
             thrusters_msg.data.extend(thurstor_values.iter());
@@ -474,15 +503,15 @@ async fn main() {
             *avg_curr = (*avg_curr * (count - 1.0) + sum_curr) / count;
             count += 1.0;
             if now.duration_since(last_log) >= log_interval {
-                 r2r::log_info!(
-                     "thruster_report",
-                     "Average thruster usage in runtime: {:.2}",
-                     *avg_curr
-                 );
-                 r2r::log_info!(
-                     "thruster_report",
-                     "Current sum of thrusters: {:.2}",
-                     sum_curr
+                r2r::log_info!(
+                    "thruster_report",
+                    "Average thruster usage in runtime: {:.2}",
+                    *avg_curr
+                );
+                r2r::log_info!(
+                    "thruster_report",
+                    "Current sum of thrusters: {:.2}",
+                    sum_curr
                 );
                 r2r::log_info!(
                     "thruster_report",
@@ -495,15 +524,15 @@ async fn main() {
 
             prev_pose_err = pose_err;
             prev_now = now;
-
-            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     };
 
     let scout = |td: Arc<MissionExecutor>| async move {
+        let mut scout_interval = tokio::time::interval(Duration::from_millis(100));
+        scout_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
         while !td.stop.load(Ordering::Relaxed) {
+            scout_interval.tick().await;
             // TODO: do scouting, this code has to have .await's so that abort works
-            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     };
     let mut scout_handle = tokio::spawn(scout(Arc::clone(&td)));
@@ -538,9 +567,12 @@ async fn main() {
     tokio::spawn(go_to_goal(Arc::clone(&td)));
 
     r2r::log_info!("", "start spinning!");
+    let mut spin_interval = tokio::time::interval(Duration::from_millis(spin_once_ms));
+    spin_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
     while !td.stop.load(Ordering::Relaxed) {
+        spin_interval.tick().await;
         let mut node_lock = td.node.lock().await;
-        node_lock.spin_once(Duration::from_millis(100));
+        node_lock.spin_once(Duration::ZERO);
         drop(node_lock);
     }
 

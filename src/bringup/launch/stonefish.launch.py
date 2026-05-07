@@ -31,6 +31,12 @@ def _launch_setup(context, *args, **kwargs):
     auv_name = LaunchConfiguration('auv_name').perform(context)
     env_file_name = LaunchConfiguration('env_file_name').perform(context)
     explicit_auv_file_name = LaunchConfiguration('auv_file_name').perform(context)
+    simulation_rate = LaunchConfiguration('simulation_rate').perform(context)
+    fast_fixed_step = LaunchConfiguration('fast_fixed_step').perform(context)
+    fixed_time_step = LaunchConfiguration('fixed_time_step').perform(context)
+    use_sim_time_stamps = LaunchConfiguration('use_sim_time_stamps').perform(context)
+    spin_once_ms = LaunchConfiguration('spin_once_ms').perform(context)
+    thruster_loop_ms = LaunchConfiguration('thruster_loop_ms').perform(context)
     headless = LaunchConfiguration('headless').perform(context).lower() in ('true', '1', 'yes')
     stonefish_only = LaunchConfiguration('stonefish_only', default="no").perform(context).lower() in ('true', '1', 'yes')
 
@@ -53,7 +59,10 @@ def _launch_setup(context, *args, **kwargs):
     simulator_arguments = {
         'simulation_data': os.path.join(bridge_share, 'data'),
         'scenario_desc': scenario_desc_path,
-        'simulation_rate': '300.0',
+        'simulation_rate': simulation_rate,
+        'fast_fixed_step': fast_fixed_step,
+        'fixed_time_step': fixed_time_step,
+        'use_sim_time_stamps': use_sim_time_stamps,
     }
     if not headless:
         simulator_arguments.update({
@@ -71,7 +80,9 @@ def _launch_setup(context, *args, **kwargs):
         f'--ros-args -p mission_name:={mission_name} '
         f'-p bridge_name:=stonefish '
         f'-p auv_name:={auv_name} '
-        f'-p live_config_path:={os.path.join(cwd, "src/bringup/config/mission_executor.toml")}; '
+        f'-p live_config_path:={os.path.join(cwd, "src/bringup/config/mission_executor.toml")} '
+        f'-p spin_once_ms:={spin_once_ms} '
+        f'-p thruster_loop_ms:={thruster_loop_ms}; '
         f'if [ $? -ne 0 ]; then exec bash; fi'
     )
 
@@ -119,6 +130,8 @@ def _launch_setup(context, *args, **kwargs):
                     'bridge_name': 'stonefish',
                     'auv_name': auv_name,
                     'live_config_path': os.path.join(cwd, 'src', 'bringup', 'config', 'mission_executor.toml'),
+                    'spin_once_ms': spin_once_ms,
+                    'thruster_loop_ms': thruster_loop_ms,
                 }],
             ),
         ]
@@ -131,6 +144,12 @@ def generate_launch_description():
 
     env_file_name_arg = DeclareLaunchArgument('env_file_name')
     auv_file_name_arg = DeclareLaunchArgument('auv_file_name', default_value='')
+    simulation_rate_arg = DeclareLaunchArgument('simulation_rate', default_value='300.0')
+    fast_fixed_step_arg = DeclareLaunchArgument('fast_fixed_step', default_value='false')
+    fixed_time_step_arg = DeclareLaunchArgument('fixed_time_step', default_value='0.0')
+    use_sim_time_stamps_arg = DeclareLaunchArgument('use_sim_time_stamps', default_value='false')
+    spin_once_ms_arg = DeclareLaunchArgument('spin_once_ms', default_value='500')
+    thruster_loop_ms_arg = DeclareLaunchArgument('thruster_loop_ms', default_value='100')
     headless_arg = DeclareLaunchArgument('headless', default_value='false')
     stonefish_only_arg = DeclareLaunchArgument('stonefish_only', default_value='false')
 
@@ -139,6 +158,12 @@ def generate_launch_description():
         auv_name_arg,
         env_file_name_arg,
         auv_file_name_arg,
+        simulation_rate_arg,
+        fast_fixed_step_arg,
+        fixed_time_step_arg,
+        use_sim_time_stamps_arg,
+        spin_once_ms_arg,
+        thruster_loop_ms_arg,
         headless_arg,
         stonefish_only_arg,
         OpaqueFunction(function=_launch_setup),

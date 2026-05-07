@@ -26,4 +26,4 @@ src/bringup/launch/depth_with_simulator.launch.py
 __pycache__/
 *.pyc
 
-
+docs/
