@@ -22,7 +22,7 @@
 				<dimensions xyz="0.04 0.45 0.04" thickness="0.003" />
 				<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
 				<material name="abs" />
-				<look name="black" />
+				<look name="blue" />
 				<compound_transform rpy="0.0 0.0 0.0" xyz="0.17 0.0 -0.03" />
 			</external_part>
 
@@ -30,19 +30,27 @@
 				<dimensions xyz="0.04 0.45 0.04" thickness="0.003" />
 				<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
 				<material name="abs" />
-				<look name="black" />
+				<look name="blue" />
 				<compound_transform rpy="0.0 0.0 0.0" xyz="-0.17 0.0 -0.03" />
 			</external_part>
-			<!-- 
-			<external_part name="Proty" type="model" physics="submerged" buoyant="true">
+			<external_part name="ProtySupport1" type="model" physics="submerged" buoyant="true">
 				<physical>
-					<mesh filename="models/proty.obj" scale="0.001" />
+					<mesh filename="models/protysupport.obj" scale="0.001" />
 					<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
 				</physical>
-				<material name="hdpe" />
-				<look name="gray" />
-				<compound_transform rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
-			</external_part> -->
+				<material name="abs" />
+				<look name="blue" />
+				<compound_transform rpy="1.5708 0.0 0.0" xyz="0.0 0.135 -0.012" />
+			</external_part>
+			<external_part name="ProtySupport2" type="model" physics="submerged" buoyant="true">
+				<physical>
+					<mesh filename="models/protysupport.obj" scale="0.001" />
+					<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+				</physical>
+				<material name="abs" />
+				<look name="blue" />
+				<compound_transform rpy="1.5708 0.0 0.0" xyz="0.0 -0.135 -0.012" />
+			</external_part>
 		</base_link>
 
 		<ros_subscriber thrusters="/bridge/thrusters" />
@@ -55,7 +63,7 @@
 			<propeller diameter="0.18" right="true">
 				<mesh filename="models/propeller.obj" scale="0.5" />
 				<material name="pvc" />
-				<look name="green" />
+				<look name="propeller" />
 			</propeller>
 			<rotor_dynamics type="mechanical_pi">
 				<kp value="1.0" />
@@ -65,7 +73,7 @@
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
 				<torque_coeff value="0.05" />
-			</thrust_model>
+			</thrust_model>Es
 		</actuator>
 
 		<actuator name="thruster_1_right" type="thruster">
