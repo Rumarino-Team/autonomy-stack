@@ -3,7 +3,7 @@
 	url = https://github.com/patrykcieslak/stonefish.git
 [submodule "vendor/stonefish_ros2"]
 	path = vendor/stonefish_ros2
-	url = https://github.com/JuanDelPueblo/stonefish_ros2.git
+	url = https://github.com/Rumarino-Team/stonefish_ros2.git
 [submodule "vendor/zed-ros-interfaces"]
 	path = vendor/zed-ros-interfaces
 	url = https://github.com/stereolabs/zed-ros2-interfaces.git

@@ -49,17 +49,31 @@ def _launch_setup(context, *args, **kwargs):
         detection_env_file_name = 'pool_env.scn'
     detection_scn_path = os.path.join(bridge_share, 'data', 'scenarios', detection_env_file_name)
 
+    # Evaluate in this launch context. Passing unevaluated LaunchConfiguration
+    # into IncludeLaunchDescription can resolve against stonefish_ros2's own
+    # defaults (use_sim_time_stamps=false).
+    simulation_rate = LaunchConfiguration('simulation_rate').perform(context)
+    fast_fixed_step_s = LaunchConfiguration('fast_fixed_step').perform(context)
+    use_sim_time_stamps = LaunchConfiguration('use_sim_time_stamps').perform(context)
+    realtime_factor_cap = LaunchConfiguration('realtime_factor_cap').perform(context)
+    fast_fixed_step = fast_fixed_step_s.lower() in ('true', '1', 'yes')
+
     simulator_launch = 'stonefish_simulator_nogpu.launch.py' if headless else 'stonefish_simulator.launch.py'
     simulator_arguments = {
         'simulation_data': os.path.join(bridge_share, 'data'),
         'scenario_desc': scenario_desc_path,
-        'simulation_rate': '300.0',
+        'simulation_rate': simulation_rate,
+        'fast_fixed_step': fast_fixed_step_s,
+        'use_sim_time_stamps': use_sim_time_stamps,
+        'realtime_factor_cap': realtime_factor_cap,
     }
     if not headless:
+        # High-quality 1080p plus camera/IMU publish at 100x realtime adds
+        # wall-clock delay that becomes seconds of plant delay in sim time.
         simulator_arguments.update({
-            'window_res_x': '1920',
-            'window_res_y': '1080',
-            'rendering_quality': 'high',
+            'window_res_x': '1280' if fast_fixed_step else '1920',
+            'window_res_y': '720' if fast_fixed_step else '1080',
+            'rendering_quality': 'low' if fast_fixed_step else 'high',
         })
 
     # Setup ROS2 workspace based on current working directory
@@ -101,27 +115,30 @@ def _launch_setup(context, *args, **kwargs):
                 'publish_all_objects': True,
             }],
         ),
-        Node(
+    ]
+    if not headless:
+        ret.append(Node(
             package='joy',
             executable='joy_node',
-        ),
-    ]
+        ))
     if not stonefish_only:
-        ret += [
-            Node(
-                package='mission_executor',
-                executable='mission_executor',
-                emulate_tty=True,
-                output='screen',
-                prefix=terminal_prefix,
-                parameters=[{
-                    'mission_name': mission_name,
-                    'bridge_name': 'stonefish',
-                    'auv_name': auv_name,
-                    'live_config_path': os.path.join(cwd, 'src', 'bringup', 'config', 'mission_executor.toml'),
-                }],
-            ),
-        ]
+        # xterm/tmux startup is ~1s of wall time. With fast_fixed_step that is
+        # minutes of uncommanded sim before the PID starts.
+        me_kwargs = {
+            'package': 'mission_executor',
+            'executable': 'mission_executor',
+            'emulate_tty': True,
+            'output': 'screen',
+            'parameters': [{
+                'mission_name': mission_name,
+                'bridge_name': 'stonefish',
+                'auv_name': auv_name,
+                'live_config_path': os.path.join(cwd, 'src', 'bringup', 'config', 'mission_executor.toml'),
+            }],
+        }
+        if mission_name == 'teleop':
+            me_kwargs['prefix'] = terminal_prefix
+        ret += [Node(**me_kwargs)]
     return ret
 
 
@@ -133,6 +150,15 @@ def generate_launch_description():
     auv_file_name_arg = DeclareLaunchArgument('auv_file_name', default_value='')
     headless_arg = DeclareLaunchArgument('headless', default_value='false')
     stonefish_only_arg = DeclareLaunchArgument('stonefish_only', default_value='false')
+    simulation_rate_arg = DeclareLaunchArgument('simulation_rate', default_value='300.0')
+    fast_fixed_step_arg = DeclareLaunchArgument('fast_fixed_step', default_value='false')
+    # Stamp odometry with simulation time so PID dt stays correct when the
+    # sim runs faster than wall clock (fast_fixed_step:=true).
+    use_sim_time_stamps_arg = DeclareLaunchArgument('use_sim_time_stamps', default_value='true')
+    # Only applies when fast_fixed_step is on; real-time stepping is already 1x.
+    # Keeps thruster command delay a fraction of a control period instead of
+    # seconds of plant time. 0.0 disables the cap.
+    realtime_factor_cap_arg = DeclareLaunchArgument('realtime_factor_cap', default_value='5.0')
 
     return LaunchDescription([
         mission_name_arg,
@@ -141,5 +167,9 @@ def generate_launch_description():
         auv_file_name_arg,
         headless_arg,
         stonefish_only_arg,
+        simulation_rate_arg,
+        fast_fixed_step_arg,
+        use_sim_time_stamps_arg,
+        realtime_factor_cap_arg,
         OpaqueFunction(function=_launch_setup),
     ])

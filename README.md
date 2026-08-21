@@ -13,7 +13,7 @@ cd ./autonomy-stack
 # Build the Docker image
 docker build -t rumarino-headless:latest .
 
-# Run headless simulation test
+# Run headless simulation test (fast_fixed_step, sim-time stamps, 5x RTF cap)
 docker run --rm \
   --name headless-test \
   rumarino-headless:latest \
@@ -22,8 +22,10 @@ docker run --rm \
     source /ros2_ws/install/setup.bash && \
     ros2 launch bringup test_mission_executor_headless.launch.py \
       mission_name:=prequalify \
-      controller_name:=stonefish_hydrus \
-      env_file_name:=hydrus_env_headless.scn &
+      env_file_name:=hydrus_env_headless.scn \
+      fast_fixed_step:=true \
+      use_sim_time_stamps:=true \
+      realtime_factor_cap:=5.0 &
     LAUNCH_PID=\$! && \
     sleep 15 && \
     kill \$LAUNCH_PID 2>/dev/null || true
@@ -257,6 +259,24 @@ ros2 launch bringup stonefish.launch.py \
     auv_name:=hydrus \
     env_file_name:=hydrus_env.scn \
     headless:=false
+
+# Faster-than-realtime graphical sim. Odometry is stamped with sim time so
+# the PID dt stays correct; realtime_factor_cap keeps plant delay bounded.
+# 0.0 disables the cap. Requires vendor/stonefish_ros2 from
+# https://github.com/Rumarino-Team/stonefish_ros2.git
+ros2 launch bringup stonefish.launch.py \
+    mission_name:=prequalify \
+    auv_name:=hydrus \
+    env_file_name:=hydrus_env.scn \
+    headless:=false \
+    fast_fixed_step:=true \
+    use_sim_time_stamps:=true \
+    realtime_factor_cap:=5.0
+
+# Headless CI-style run (nogpu, 5x cap)
+ros2 launch bringup test_mission_executor_headless.launch.py \
+    mission_name:=prequalify \
+    env_file_name:=hydrus_env_headless.scn
 
 # proteus, teleop mission
 # if you don't have xterm, set TERMINAL to your terminal or install xterm.
