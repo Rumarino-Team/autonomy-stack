@@ -12,7 +12,7 @@ mod inotify;
 use std::ops::Bound;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use arc_swap::ArcSwap;
 use parry3d_f64::shape::Segment;
 use tokio::sync::{Mutex, Notify};
@@ -71,6 +71,10 @@ const BATTERY_CAPACITY: f64 = 5000.0; //in mAh
 
 fn wrap_angle(angle: f64) -> f64 {
     (angle + std::f64::consts::PI).rem_euclid(2.0 * std::f64::consts::PI) - std::f64::consts::PI
+}
+
+fn pose_stamp_ns(stamp: &r2r::builtin_interfaces::msg::Time) -> i64 {
+    i64::from(stamp.sec) * 1_000_000_000 + i64::from(stamp.nanosec)
 }
 
 impl MissionExecutor {
@@ -360,12 +364,6 @@ async fn main() {
         }
     };
 
-    let consume_odometry_sub = |td: Arc<MissionExecutor>| async move {
-        while let Some(msg) = odometry_sub.next().await {
-            td.pose.store(Arc::new(Pose::from(&msg.pose.pose)));
-        }
-    };
-
     let cfg = Arc::new(ArcSwap::from_pointee(load_live_config(&live_config_path, &auv_name).unwrap()));
 
     let mut inotify_stream = inotify::InotifyStream::new();
@@ -388,19 +386,30 @@ async fn main() {
     let go_to_goal = |td: Arc<MissionExecutor>| async move {
         let mut sum_err = Vector6::zeros();
         let mut prev_pose_err = Vector6::zeros();
-        let mut prev_now = Instant::now();
+        let mut previous_timestamp_ns: Option<i64> = None;
         let mut count = 1.0; //Technically can be an integer but since we are multiplying by float...
-        let log_interval = Duration::from_millis(500);
-        let mut last_log = Instant::now();
-        while !td.stop.load(Ordering::Relaxed) {
+        let log_interval_s = 0.5;
+        let mut last_log_s: Option<f64> = None;
+        while let Some(msg) = odometry_sub.next().await {
+            if td.stop.load(Ordering::Relaxed) {
+                break;
+            }
+
+            let pose = Pose::from(&msg.pose.pose);
+            td.pose.store(Arc::new(pose));
+
             let current_cfg = cfg.load();
             let PidConfig { kp, ki, kd } = current_cfg.pid[&bridge_name];
             let tam_x_y_z_roll_pitch_yaw = &current_cfg.tam;
 
-            let now = Instant::now();
-            let dt = now.duration_since(prev_now).as_secs_f64();
+            let timestamp_ns = pose_stamp_ns(&msg.header.stamp);
+            let dt = previous_timestamp_ns.and_then(|previous| {
+                let elapsed_ns = timestamp_ns - previous;
+                (elapsed_ns > 0).then_some(elapsed_ns as f64 * 1e-9)
+            });
+            previous_timestamp_ns = Some(timestamp_ns);
+            let now_s = timestamp_ns as f64 * 1e-9;
 
-            let pose = **td.pose.load();
             let goal = **td.goal.load();
             let current_pose = Vector6::<f64>::from(pose);
 
@@ -429,8 +438,12 @@ async fn main() {
 
             pose_err[5] = yaw_error;
 
-            let vel_err = (pose_err - prev_pose_err) / dt;
-            sum_err += pose_err * dt;
+            let vel_err = if let Some(dt) = dt {
+                sum_err += pose_err * dt;
+                (pose_err - prev_pose_err) / dt
+            } else {
+                Vector6::zeros()
+            };
 
             let wrench = kp.component_mul(&pose_err)
                 + ki.component_mul(&sum_err)
@@ -473,7 +486,7 @@ async fn main() {
             let mut avg_curr = td.avg_current.lock().await;
             *avg_curr = (*avg_curr * (count - 1.0) + sum_curr) / count;
             count += 1.0;
-            if now.duration_since(last_log) >= log_interval {
+            if last_log_s.map(|prev| now_s - prev >= log_interval_s).unwrap_or(false) {
                  r2r::log_info!(
                      "thruster_report",
                      "Average thruster usage in runtime: {:.2}",
@@ -489,14 +502,13 @@ async fn main() {
                     "Estimated battery life remaining: {:.2}",
                     BATTERY_CAPACITY / *avg_curr
                 );
-                last_log = now;
+                last_log_s = Some(now_s);
+            } else if last_log_s.is_none() {
+                last_log_s = Some(now_s);
             }
             drop(avg_curr);
 
             prev_pose_err = pose_err;
-            prev_now = now;
-
-            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     };
 
@@ -533,7 +545,6 @@ async fn main() {
 
     tokio::spawn(consume_inotify_stream());
     tokio::spawn(consume_map_sub(Arc::clone(&td)));
-    tokio::spawn(consume_odometry_sub(Arc::clone(&td)));
     tokio::spawn(consume_new_objects(Arc::clone(&td)));
     tokio::spawn(go_to_goal(Arc::clone(&td)));
 
