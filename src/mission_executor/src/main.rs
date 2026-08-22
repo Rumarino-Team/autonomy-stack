@@ -388,8 +388,6 @@ async fn main() {
         let mut prev_pose_err = Vector6::zeros();
         let mut previous_timestamp_ns: Option<i64> = None;
         let mut count = 1.0; //Technically can be an integer but since we are multiplying by float...
-        let log_interval_s = 0.5;
-        let mut last_log_s: Option<f64> = None;
         while let Some(msg) = odometry_sub.next().await {
             if td.stop.load(Ordering::Relaxed) {
                 break;
@@ -408,7 +406,6 @@ async fn main() {
                 (elapsed_ns > 0).then_some(elapsed_ns as f64 * 1e-9)
             });
             previous_timestamp_ns = Some(timestamp_ns);
-            let now_s = timestamp_ns as f64 * 1e-9;
 
             let goal = **td.goal.load();
             let current_pose = Vector6::<f64>::from(pose);
@@ -486,26 +483,21 @@ async fn main() {
             let mut avg_curr = td.avg_current.lock().await;
             *avg_curr = (*avg_curr * (count - 1.0) + sum_curr) / count;
             count += 1.0;
-            if last_log_s.map(|prev| now_s - prev >= log_interval_s).unwrap_or(false) {
-                 r2r::log_info!(
-                     "thruster_report",
-                     "Average thruster usage in runtime: {:.2}",
-                     *avg_curr
-                 );
-                 r2r::log_info!(
-                     "thruster_report",
-                     "Current sum of thrusters: {:.2}",
-                     sum_curr
-                );
-                r2r::log_info!(
-                    "thruster_report",
-                    "Estimated battery life remaining: {:.2}",
-                    BATTERY_CAPACITY / *avg_curr
-                );
-                last_log_s = Some(now_s);
-            } else if last_log_s.is_none() {
-                last_log_s = Some(now_s);
-            }
+            r2r::log_info!(
+                "thruster_report",
+                "Average thruster usage in runtime: {:.2}",
+                *avg_curr
+            );
+            r2r::log_info!(
+                "thruster_report",
+                "Current sum of thrusters: {:.2}",
+                sum_curr
+            );
+            r2r::log_info!(
+                "thruster_report",
+                "Estimated battery life remaining: {:.2}",
+                BATTERY_CAPACITY / *avg_curr
+            );
             drop(avg_curr);
 
             prev_pose_err = pose_err;
