@@ -403,7 +403,15 @@ async fn main() {
             let timestamp_ns = pose_stamp_ns(&msg.header.stamp);
             let dt = previous_timestamp_ns.and_then(|previous| {
                 let elapsed_ns = timestamp_ns - previous;
-                (elapsed_ns > 0).then_some(elapsed_ns as f64 * 1e-9)
+                if elapsed_ns > 0 {
+                    Some(elapsed_ns as f64 * 1e-9)
+                } else {
+                    r2r::log_warn!(
+                        "go_to_goal",
+                        "odometry stamp not increasing (prev={previous} ns, now={timestamp_ns} ns); skipping I/D"
+                    );
+                    None
+                }
             });
             previous_timestamp_ns = Some(timestamp_ns);
 
