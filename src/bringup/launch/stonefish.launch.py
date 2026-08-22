@@ -115,30 +115,27 @@ def _launch_setup(context, *args, **kwargs):
                 'publish_all_objects': True,
             }],
         ),
-    ]
-    if not headless:
-        ret.append(Node(
+        Node(
             package='joy',
             executable='joy_node',
-        ))
+        ),
+    ]
     if not stonefish_only:
-        # xterm/tmux startup is ~1s of wall time. With fast_fixed_step that is
-        # minutes of uncommanded sim before the PID starts.
-        me_kwargs = {
-            'package': 'mission_executor',
-            'executable': 'mission_executor',
-            'emulate_tty': True,
-            'output': 'screen',
-            'parameters': [{
-                'mission_name': mission_name,
-                'bridge_name': 'stonefish',
-                'auv_name': auv_name,
-                'live_config_path': os.path.join(cwd, 'src', 'bringup', 'config', 'mission_executor.toml'),
-            }],
-        }
-        if mission_name == 'teleop':
-            me_kwargs['prefix'] = terminal_prefix
-        ret += [Node(**me_kwargs)]
+        ret += [
+            Node(
+                package='mission_executor',
+                executable='mission_executor',
+                emulate_tty=True,
+                output='screen',
+                prefix=terminal_prefix,
+                parameters=[{
+                    'mission_name': mission_name,
+                    'bridge_name': 'stonefish',
+                    'auv_name': auv_name,
+                    'live_config_path': os.path.join(cwd, 'src', 'bringup', 'config', 'mission_executor.toml'),
+                }],
+            ),
+        ]
     return ret
 
 

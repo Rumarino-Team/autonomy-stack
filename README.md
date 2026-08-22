@@ -20,9 +20,11 @@ docker run --rm \
   bash -c "
     source /opt/ros/jazzy/setup.bash && \
     source /ros2_ws/install/setup.bash && \
-    ros2 launch bringup test_mission_executor_headless.launch.py \
+    ros2 launch bringup stonefish.launch.py \
       mission_name:=prequalify \
+      auv_name:=hydrus \
       env_file_name:=hydrus_env_headless.scn \
+      headless:=true \
       fast_fixed_step:=true \
       use_sim_time_stamps:=true \
       realtime_factor_cap:=5.0 &
@@ -274,9 +276,14 @@ ros2 launch bringup stonefish.launch.py \
     realtime_factor_cap:=5.0
 
 # Headless CI-style run (nogpu, 5x cap)
-ros2 launch bringup test_mission_executor_headless.launch.py \
+ros2 launch bringup stonefish.launch.py \
     mission_name:=prequalify \
-    env_file_name:=hydrus_env_headless.scn
+    auv_name:=hydrus \
+    env_file_name:=hydrus_env_headless.scn \
+    headless:=true \
+    fast_fixed_step:=true \
+    use_sim_time_stamps:=true \
+    realtime_factor_cap:=5.0
 
 # proteus, teleop mission
 # if you don't have xterm, set TERMINAL to your terminal or install xterm.
