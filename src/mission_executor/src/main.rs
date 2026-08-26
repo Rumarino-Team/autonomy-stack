@@ -401,18 +401,21 @@ async fn main() {
             let tam_x_y_z_roll_pitch_yaw = &current_cfg.tam;
 
             let timestamp_ns = pose_stamp_ns(&msg.header.stamp);
-            let dt = previous_timestamp_ns.and_then(|previous| {
-                let elapsed_ns = timestamp_ns - previous;
-                if elapsed_ns > 0 {
-                    Some(elapsed_ns as f64 * 1e-9)
-                } else {
-                    r2r::log_warn!(
-                        "go_to_goal",
-                        "odometry stamp not increasing (prev={previous} ns, now={timestamp_ns} ns); skipping I/D"
-                    );
-                    None
+            let dt = match previous_timestamp_ns {
+                Some(previous) => {
+                    let elapsed_ns = timestamp_ns - previous;
+                    if elapsed_ns > 0 {
+                        elapsed_ns as f64 * 1e-9
+                    } else {
+                        r2r::log_warn!(
+                            "go_to_goal",
+                            "odometry stamp not increasing (prev={previous} ns, now={timestamp_ns} ns); using 100 ms dt"
+                        );
+                        0.1
+                    }
                 }
-            });
+                None => 0.1,
+            };
             previous_timestamp_ns = Some(timestamp_ns);
 
             let goal = **td.goal.load();
@@ -443,12 +446,8 @@ async fn main() {
 
             pose_err[5] = yaw_error;
 
-            let vel_err = if let Some(dt) = dt {
-                sum_err += pose_err * dt;
-                (pose_err - prev_pose_err) / dt
-            } else {
-                Vector6::zeros()
-            };
+            let vel_err = (pose_err - prev_pose_err) / dt;
+            sum_err += pose_err * dt;
 
             let wrench = kp.component_mul(&pose_err)
                 + ki.component_mul(&sum_err)

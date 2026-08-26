@@ -79,7 +79,18 @@ def _launch_setup(context, *args, **kwargs):
     explicit_auv_file_name = LaunchConfiguration('auv_file_name').perform(context)
     headless = LaunchConfiguration('headless').perform(context).lower() in ('true', '1', 'yes')
     stonefish_only = LaunchConfiguration('stonefish_only', default="no").perform(context).lower() in ('true', '1', 'yes')
+    fast_fixed_step_s = LaunchConfiguration('fast_fixed_step').perform(context)
+    fast_fixed_step = fast_fixed_step_s.lower() in ('true', '1', 'yes')
     use_joy = LaunchConfiguration('use_joy').perform(context).lower() in ('true', '1', 'yes')
+
+    # Sim-time stamps and RTF cap are for fast_fixed_step runs. Real-time graphical
+    # sim uses wall-clock odometry stamps (stonefish_ros2 default when fast=false).
+    use_sim_time_stamps = LaunchConfiguration('use_sim_time_stamps').perform(context)
+    if not fast_fixed_step:
+        use_sim_time_stamps = 'false'
+    realtime_factor_cap = LaunchConfiguration('realtime_factor_cap').perform(context)
+    if not fast_fixed_step:
+        realtime_factor_cap = '0.0'
 
     cwd = os.getcwd()
     bridge_share = get_package_share_directory('bridge_stonefish')
@@ -100,10 +111,6 @@ def _launch_setup(context, *args, **kwargs):
     # into IncludeLaunchDescription can resolve against stonefish_ros2's own
     # defaults (use_sim_time_stamps=false).
     simulation_rate = LaunchConfiguration('simulation_rate').perform(context)
-    fast_fixed_step_s = LaunchConfiguration('fast_fixed_step').perform(context)
-    use_sim_time_stamps = LaunchConfiguration('use_sim_time_stamps').perform(context)
-    realtime_factor_cap = LaunchConfiguration('realtime_factor_cap').perform(context)
-    fast_fixed_step = fast_fixed_step_s.lower() in ('true', '1', 'yes')
 
     simulator_launch = 'stonefish_simulator_nogpu.launch.py' if headless else 'stonefish_simulator.launch.py'
     simulator_arguments = {
@@ -249,14 +256,20 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'use_sim_time_stamps',
-            default_value='true',
-            description='Stamp odometry with simulation time so PID dt stays correct when running faster than realtime.',
+            default_value='false',
+            description=(
+                'Stamp odometry with simulation time (for fast_fixed_step). '
+                'Automatically forced false for real-time sim.'
+            ),
             choices=['true', 'false'],
         ),
         DeclareLaunchArgument(
             'realtime_factor_cap',
-            default_value='5.0',
-            description='Max sim-time/wall-time ratio when fast_fixed_step is on. 0.0 disables the cap.',
+            default_value='0.0',
+            description=(
+                'Max sim-time/wall-time ratio when fast_fixed_step is on. '
+                'Automatically 0 (disabled) for real-time sim. CI uses 5.0.'
+            ),
         ),
         OpaqueFunction(function=_launch_setup),
     ])
