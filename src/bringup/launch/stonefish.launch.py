@@ -33,6 +33,7 @@ def _launch_setup(context, *args, **kwargs):
     explicit_auv_file_name = LaunchConfiguration('auv_file_name').perform(context)
     headless = LaunchConfiguration('headless').perform(context).lower() in ('true', '1', 'yes')
     stonefish_only = LaunchConfiguration('stonefish_only', default="no").perform(context).lower() in ('true', '1', 'yes')
+    use_joy = LaunchConfiguration('use_joy').perform(context).lower() in ('true', '1', 'yes')
 
     cwd = os.getcwd()
     bridge_share = get_package_share_directory('bridge_stonefish')
@@ -101,11 +102,12 @@ def _launch_setup(context, *args, **kwargs):
                 'publish_all_objects': True,
             }],
         ),
-        Node(
+    ]
+    if use_joy:
+        ret.append(Node(
             package='joy',
             executable='joy_node',
-        ),
-    ]
+        ))
     if not stonefish_only:
         ret += [
             Node(
@@ -133,6 +135,11 @@ def generate_launch_description():
     auv_file_name_arg = DeclareLaunchArgument('auv_file_name', default_value='')
     headless_arg = DeclareLaunchArgument('headless', default_value='false')
     stonefish_only_arg = DeclareLaunchArgument('stonefish_only', default_value='false')
+    use_joy_arg = DeclareLaunchArgument(
+        'use_joy',
+        default_value='false',
+        description='Start joy_node (requires ros-jazzy-joy). Use for teleop.',
+    )
 
     return LaunchDescription([
         mission_name_arg,
@@ -141,5 +148,6 @@ def generate_launch_description():
         auv_file_name_arg,
         headless_arg,
         stonefish_only_arg,
+        use_joy_arg,
         OpaqueFunction(function=_launch_setup),
     ])

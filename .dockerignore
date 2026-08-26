@@ -41,6 +41,14 @@ src/neural_depth/
 src/neural_depth_ros2/
 src/rviz_plugin_zed_od/
 src/zed*/
+src/orb_slam3_ros2/
+tools/kalibr/
+vendor/ORB_SLAM3/
+vendor/zed-ros-interfaces/
+vendor/zed-ros2-examples/
+vendor/depth_anything_v2/
+vendor/joystick_drivers/
+external/
 
 # Compiled files
 compile_commands.json

@@ -1,4 +1,3 @@
-
 ## Simulation
 
 ### Clone and go in repo
@@ -31,210 +30,108 @@ docker run --rm \
 ```
 
 ## Local Development Setup
- System Dependencies
+System Dependencies
 
 ### Required Tools
 - Python 3
-- C++ compiler (GCC)
-- Rust
+- C++ compiler (GCC) + CMake
+- Rust ([rustup](https://rustup.rs))
+- Clang/LLVM (for Rust ROS 2 bindings / r2r)
+
+Install a **minimal** ROS 2 Jazzy (`ros-base`), not `desktop`. Optional tools (joy, usb_cam, rviz) are listed under the profiles that need them.
 
 ### Fedora:
 ```sh
-# Install essential build tools
-sudo dnf install python3 python3-pip gcc gcc-c++ rust cargo
+# Build tools + Rust
+sudo dnf install python3 python3-pip gcc gcc-c++ cmake pkgconf-pkg-config rust cargo
 
-# Install ROS 2
+# ROS 2 (minimal) + sim msgs
 sudo dnf copr enable tavie/ros2
-sudo dnf install ros-jazzy-desktop
-sudo dnf install ros-jazzy-vision-msgs
-sudo dnf install freetype-devel
-sudo dnf install SDL2-devel
-sudo dnf install glm-devel
-sudo dnf install eigen3-devel
-sudo dnf install ogre-devel
-sudo dnf install opencv-devel
-sudo dnf install openssl-devel
-sudo dnf install boost-devel
-sudo dnf install libepoxy-devel
+sudo dnf install ros-jazzy-ros-base ros-jazzy-vision-msgs \
+  ros-jazzy-image-transport ros-jazzy-pcl-conversions ros-jazzy-visualization-msgs \
+  python3-colcon-common-extensions
+
+# Stonefish + detection_mocker system libs (include SDL2 for Stonefish)
+sudo dnf install freetype-devel glm-devel eigen3-devel tinyxml2-devel \
+  mesa-libGL-devel libclang-devel clang SDL2-devel
+
 python3 -m pip install wheel
 ```
+
 ### Ubuntu:
 ```bash
-# Install essential build tools
 sudo apt update
-sudo apt install -y python3 python3-pip python3-venv build-essential curl
-
-# Install Clang/LLVM (required for Rust ROS 2 bindings)
-sudo apt install -y libclang-dev llvm-dev clang
+sudo apt install -y python3 python3-pip build-essential cmake pkg-config curl \
+  libclang-dev llvm-dev clang \
+  python3-colcon-common-extensions
 
 # Add ROS 2 repository (if not already added)
 sudo apt install -y software-properties-common
 sudo add-apt-repository universe
 sudo apt update
 sudo apt install -y curl gnupg lsb-release
-sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+  -o /usr/share/keyrings/ros-archive-keyring.gpg
 
-# Install ROS 2 and dependencies
+# System dependencies
 sudo apt update
-sudo apt install -y ros-jazzy-desktop \
-    ros-jazzy-vision-msgs \
-  ros-jazzy-sensor-msgs \
-  ros-jazzy-geometry-msgs \
-  ros-jazzy-rviz2 \
-  ros-jazzy-usb-cam \
-    libfreetype6-dev \
-    libsdl2-dev \
-    libglm-dev \
-    libeigen3-dev \
-  libogre-1.12-dev \
-    libopencv-dev \
-    libssl-dev \
-    libboost-all-dev \
-    libepoxy-dev \
-    libtinyxml2-dev \
-  ros-jazzy-pangolin \
-    socat \
-    pkg-config
+sudo apt install -y ros-jazzy-ros-base \
+  ros-jazzy-vision-msgs \
+  ros-jazzy-image-transport \
+  ros-jazzy-pcl-conversions \
+  ros-jazzy-visualization-msgs \
+  libfreetype6-dev \
+  libglm-dev \
+  libeigen3-dev \
+  libtinyxml2-dev \
+  libgl1-mesa-dev
+
+# Optional: system SDL2 (Stonefish uses libsdl2-dev on Linux)
+sudo apt install -y libsdl2-dev
+
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ```
 
-### Install Stonefish Simulator
-```sh
-cd ./vendor/stonefish
-mkdir build
-cd build
-cmake ..
-make -j16 # (where X is the number of threads)
-sudo make install
-cd ../../../../../
+### Optional profiles (install only if you need them)
+
+```bash
+# Teleop joystick (stonefish.launch.py use_joy:=true)
+sudo apt install -y ros-jazzy-joy          # Fedora: ros-jazzy-joy
+
+# Hardware Proteus camera / mock serial
+sudo apt install -y ros-jazzy-usb-cam socat
+
+# GUI visualization (not required for sim/CI)
+sudo apt install -y ros-jazzy-rviz2
 ```
+
+### Build
+```sh
+source /opt/ros/jazzy/setup.bash
+colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+source install/setup.bash
+```
+
+Stonefish (`vendor/stonefish`) is a colcon cmake package and installs into `install/` with everything else. `stonefish_ros2` declares a build dependency on it, so colcon builds them in order.
+
+Optional stacks (ZED vision) are ignored via `COLCON_IGNORE` under `src/zed_custom_wrapper/`.
 
 ## Computer Vision
 
 ### ZED Custom Wrapper
+
+`zed_custom_wrapper` is ignored by default (`COLCON_IGNORE`) so a normal sim build stays lean. Remove that file before building vision.
 
 ### Dependencies
   - [ZED-SDK 5.1](https://www.stereolabs.com/developers/release)
   - [Cuda 12.8](https://developer.nvidia.com/cuda-12-8-0-download-archive)
 
 ```sh
-colcon build --packages-select zed_msg zed_custom_wrapper && source ./install/setup.bash && ros2 launch zed_custom_wrapper zed_custom.launch.py onnx_model_path:=./src/zed_custom_wrapper/yolov8n.onnx
-```
-
-### Jetson run using prebuilt Orb-Slam3 libraries
-
-This is the recommended path on Jetson devices when ORB-SLAM3 cannot be compiled locally.
-
-#### 1. Download the prebuilt bundle
-```bash
-cd /home/cesar/autonomy-stack
-curl -L -o /tmp/orbslam-artifacts.zip \
-  https://github.com/Rumarino-Team/autonomy-stack/releases/download/orb_slam_libs/artifacts.zip
-```
-
-#### 2. Install the bundle into the workspace (Jetson Only)
-```bash
-rm -rf /tmp/orbslam-artifacts-extract
-mkdir -p /tmp/orbslam-artifacts-extract
-unzip -o /tmp/orbslam-artifacts.zip -d /tmp/orbslam-artifacts-extract
-ART=/tmp/orbslam-artifacts-extract/artifacts/orbslam-arm64/
-sudo install -m 644 $ART/lib/* /usr/lib/ && sudo ldconfig
-```
-
-#### 3. Run the launch file
-```bash
-ros2 launch orb_slam3_ros2 orb_slam_sim_launch.py
-```
-
-
-Example using all optional arguments:
-
-```bash
-ros2 launch orb_slam3_ros2 orb_slam_sim_launch.py \
-  use_viewer:=true \
-  use_imu:=true \
-  use_depth:=false \
-  image_topic:=/camera/color/image_raw \
-  depth_topic:=/camera/depth/image_raw \
-  imu_topic:=/vectornav/imu \
-  settings_file:=/home/cesar/autonomy-stack/src/orb_slam3_ros2/config/webcamera.yaml \
-  use_usb_cam:=true \
-  use_vectornav:=true
-```
-
-#### Notes
-* The artifact bundle is built for Jetson-compatible Ubuntu 22.04 / ROS Humble ABI levels.
-
-## Kalibr (Camera + IMU calibration)
-
-Use the repository Kalibr wrapper in `tools/kalibr` to calibrate camera intrinsics and camera-IMU extrinsics.
-
-### 1) Prepare tools
-```sh
-docker pull stereolabs/kalibr:latest
-chmod +x tools/kalibr/run_kalibr.sh
-chmod +x tools/kalibr/extract_orbslam_tbc.py
-```
-
-### 2) Record calibration bags
-```sh
-# Camera intrinsics bag
-ros2 bag record /usb_cam/image_raw -o bags/cam_intrinsics
-# Camera + IMU bag for extrinsics
-ros2 bag record /usb_cam/image_raw /vectornav/imu -o bags/imucam
-```
-
-### 3) Calibrate camera intrinsics
-```sh
-bash tools/kalibr/run_kalibr.sh kalibr_calibrate_cameras \
-  --bag /work/bags/cam_intrinsics.bag \
-  --topics /usb_cam/image_raw \
-  --models pinhole-radtan \
-  --target /work/tools/kalibr/config/aprilgrid_6x6_80x30.yaml
-```
-
-Output: `camchain-cam_intrinsics.yaml`
-
-### 4) Prepare IMU noise config
-Edit `tools/kalibr/config/imu.yaml` and fill real Allan-variance noise values.
-
-### 5) Calibrate camera-IMU extrinsics
-```sh
-bash tools/kalibr/run_kalibr.sh kalibr_calibrate_imu_camera \
-  --bag /work/bags/imucam.bag \
-  --cam /work/camchain-cam_intrinsics.yaml \
-  --imu /work/tools/kalibr/config/imu.yaml \
-  --target /work/tools/kalibr/config/aprilgrid_6x6_80x30.yaml
-```
-
-Output: `camchain-imucam.yaml`
-
-### 6) Get ORB-SLAM calibration matrix
-```sh
-python3 tools/kalibr/extract_orbslam_tbc.py camchain-imucam.yaml
-```
-
-Copy the printed matrix into both keys in `src/orb_slam3_ros2/config/webcamera.yaml`:
-- `IMU.T_b_c1`
-- `Tbc`
-
-### Notes
-- If Kalibr cannot read your ROS 2 bag directly, convert it to ROS1 bag format first.
-- Ensure the topic names passed to Kalibr exactly match your recorded bag topics.
-
-
-
-
-## Build using bridge_stonefish
-```sh
-# Source ROS 2 environment
-source /opt/ros/jazzy/setup.bash
-
-# Build packages
-colcon build \
-    --packages-select interfaces bringup mission_executor bridge_stonefish Stonefish stonefish_ros2 detection_mocker joy sdl2_vendor
-
-# Source the workspace
-source install/setup.bash
+rm -f src/zed_custom_wrapper/COLCON_IGNORE
+# also init vendor/zed-ros-interfaces if you need zed_msgs
+colcon build --packages-select zed_msgs zed_custom_wrapper && source ./install/setup.bash && \
+  ros2 launch zed_custom_wrapper zed_custom.launch.py onnx_model_path:=./src/zed_custom_wrapper/yolov8n.onnx
 ```
 
 ## Simulate Missions using bridge_stonefish
@@ -258,7 +155,7 @@ ros2 launch bringup stonefish.launch.py \
     env_file_name:=hydrus_env.scn \
     headless:=false
 
-# proteus, teleop mission
+# proteus, teleop mission (needs ros-jazzy-joy)
 # if you don't have xterm, set TERMINAL to your terminal or install xterm.
 # sudo apt install xterm
 # sudo dnf install xterm
@@ -266,14 +163,16 @@ ros2 launch bringup stonefish.launch.py \
     mission_name:=teleop \
     auv_name:=proteus \
     env_file_name:=proteus_env.scn \
-    headless:=false
+    headless:=false \
+    use_joy:=true
 
 # bluerov2, teleop mission
 ros2 launch bringup stonefish.launch.py \
   mission_name:=teleop \
   auv_name:=bluerov2 \
   env_file_name:=pool_env.scn \
-  headless:=false
+  headless:=false \
+  use_joy:=true
 
 # optional manual override (advanced)
 ros2 launch bringup stonefish.launch.py \
@@ -281,7 +180,8 @@ ros2 launch bringup stonefish.launch.py \
   auv_name:=bluerov2 \
   env_file_name:=pool_env.scn \
   auv_file_name:=bluerov2.scn \
-  headless:=false
+  headless:=false \
+  use_joy:=true
 
 # bluerov2 direct actuator sanity test
 # Use stonefish_only so mission_executor does not overwrite the direct command.
@@ -306,6 +206,11 @@ ros2 topic echo /bridge/thruster_state
 
 ## Build & Run proteus using bridge_hardware
 
+### Extra deps
+```sh
+sudo apt install -y ros-jazzy-usb-cam socat   # usb_cam optional; socat for mock Arduino
+```
+
 ### Build
 ```sh
 # Source ROS 2 environment
@@ -313,7 +218,7 @@ source /opt/ros/jazzy/setup.bash
 
 # Build packages
 colcon build \
-  --packages-select interfaces bringup mission_executor bridge_hardware vectornav vectornav_msgs \
+  --packages-select interfaces bringup mission_executor bridge_hardware \
   --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ```
 
