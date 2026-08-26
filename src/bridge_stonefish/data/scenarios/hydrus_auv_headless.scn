@@ -47,7 +47,7 @@
 			</external_part>
 		</base_link>
 
-		<ros_subscriber thrusters="/hydrus/thrusters" />
+		<ros_subscriber thrusters="/bridge/thrusters" />
 
 		<!-- Corner Thrusters -->
 		<actuator name="thruster_front_left" type="thruster">
@@ -222,7 +222,7 @@
 		<sensor name="Odometry" type="odometry" rate="30.0">
 			<link name="Hydrus" />
 			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
-			<ros_publisher topic="/hydrus/odometry" />
+			<ros_publisher topic="/bridge/odometry" />
 		</sensor>
 
 		<!-- Camera sensor removed for headless mode compatibility -->

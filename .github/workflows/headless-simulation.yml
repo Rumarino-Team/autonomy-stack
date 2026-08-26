@@ -1,6 +1,7 @@
 name: Headless Simulation Test
 
 on:
+  pull_request:
   push:
     branches: [ main, docker, zed_node_update ]
 
@@ -26,10 +27,11 @@ jobs:
         context: .
         push: false
         tags: rumarino-headless:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=rumarino-headless
+        cache-to: type=gha,mode=max,scope=rumarino-headless
         outputs: type=docker
 
+    # fast_fixed_step + sim stamps, RTF cap 5x. 15 s wall ≈ 75 s sim.
     - name: Run headless simulation test
       run: |
         docker run --rm \
@@ -38,9 +40,14 @@ jobs:
           bash -c "
             source /opt/ros/jazzy/setup.bash && \
             source /ros2_ws/install/setup.bash && \
-            ros2 launch bringup test_mission_executor_headless.launch.py \
+            ros2 launch bringup stonefish.launch.py \
               mission_name:=prequalify \
-              env_file_name:=hydrus_env_headless.scn &
+              auv_name:=hydrus \
+              env_file_name:=hydrus_env_headless.scn \
+              headless:=true \
+              fast_fixed_step:=true \
+              use_sim_time_stamps:=true \
+              realtime_factor_cap:=5.0 &
             LAUNCH_PID=\$! && \
             sleep 15 && \
             kill \$LAUNCH_PID 2>/dev/null || true

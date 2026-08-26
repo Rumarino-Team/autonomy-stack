@@ -31,6 +31,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     libboost-all-dev \
     libepoxy-dev \
+    libtinyxml2-dev \
+    ros-jazzy-visualization-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
@@ -55,6 +57,7 @@ COPY src/interfaces/package.xml ./src/interfaces/package.xml
 COPY src/bringup/package.xml ./src/bringup/package.xml
 COPY src/bridge_stonefish/package.xml ./src/bridge_stonefish/package.xml
 COPY src/mission_executor/package.xml ./src/mission_executor/package.xml
+COPY src/detection_mocker/package.xml ./src/detection_mocker/package.xml
 COPY vendor/stonefish_ros2/package.xml ./src/stonefish_ros2/package.xml
 
 RUN rosdep init || true && \
@@ -84,12 +87,13 @@ RUN bash -lc "source /opt/ros/jazzy/setup.bash && \
 
 COPY src/bringup ./src/bringup
 COPY src/bridge_stonefish ./src/bridge_stonefish
+COPY src/detection_mocker ./src/detection_mocker
 COPY vendor/stonefish_ros2 ./src/stonefish_ros2
 
 # build ROS 2 workspace except interfaces and mission_executor
 RUN bash -c "source /opt/ros/jazzy/setup.bash && \
     colcon build \
-    --packages-select stonefish_ros2 bridge_stonefish bringup \
+    --packages-select stonefish_ros2 bridge_stonefish bringup detection_mocker \
     --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
 # build mission_executor with actual source code
