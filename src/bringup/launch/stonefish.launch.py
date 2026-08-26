@@ -6,17 +6,54 @@ from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
+# --- discoverable configuration (also validated via --show-args choices) ---
+
+MISSIONS = (
+    'prequalify',
+    'teleop',
+    'drop_into_box',
+    'cardinal_directions',
+)
+
+AUVS = (
+    'hydrus',
+    'proteus',
+    'bluerov2',
+    'girona500',
+)
+
+ENV_FILES = (
+    'auto',
+    'hydrus_env.scn',
+    'hydrus_env_headless.scn',
+    'proteus_env.scn',
+    'pool_env.scn',
+    'pool_env_hydrus.scn',
+    'pool_env_proteus.scn',
+    'pool_env_bluerov2.scn',
+    'pool_env_girona500.scn',
+    'bluerov2_tank.scn',
+)
 
 DEFAULT_AUV_FILE_BY_NAME = {
     'bluerov2': 'bluerov2.scn',
     'proteus': 'proteus_auv.scn',
     'hydrus': 'hydrus_auv.scn',
+    'girona500': 'girona500_auv.scn',
+}
+
+DEFAULT_ENV_BY_AUV = {
+    'hydrus': 'hydrus_env.scn',
+    'proteus': 'proteus_env.scn',
+    'bluerov2': 'pool_env.scn',
+    'girona500': 'pool_env.scn',
 }
 
 POOL_ENV_SCENARIO_BY_AUV = {
     'bluerov2': 'pool_env_bluerov2.scn',
     'proteus': 'pool_env_proteus.scn',
     'hydrus': 'pool_env_hydrus.scn',
+    'girona500': 'pool_env_girona500.scn',
 }
 
 
@@ -26,13 +63,34 @@ def _resolve_auv_file_name(auv_name, explicit_auv_file_name):
     return DEFAULT_AUV_FILE_BY_NAME.get(auv_name, f'{auv_name}.scn')
 
 
+def _resolve_env_file_name(auv_name, env_file_name):
+    if env_file_name in ('', 'auto'):
+        return DEFAULT_ENV_BY_AUV.get(auv_name, f'{auv_name}_env.scn')
+    return env_file_name
+
+
 def _launch_setup(context, *args, **kwargs):
     mission_name = LaunchConfiguration('mission_name').perform(context)
     auv_name = LaunchConfiguration('auv_name').perform(context)
-    env_file_name = LaunchConfiguration('env_file_name').perform(context)
+    env_file_name = _resolve_env_file_name(
+        auv_name,
+        LaunchConfiguration('env_file_name').perform(context),
+    )
     explicit_auv_file_name = LaunchConfiguration('auv_file_name').perform(context)
     headless = LaunchConfiguration('headless').perform(context).lower() in ('true', '1', 'yes')
     stonefish_only = LaunchConfiguration('stonefish_only', default="no").perform(context).lower() in ('true', '1', 'yes')
+    fast_fixed_step_s = LaunchConfiguration('fast_fixed_step').perform(context)
+    fast_fixed_step = fast_fixed_step_s.lower() in ('true', '1', 'yes')
+    use_joy = LaunchConfiguration('use_joy').perform(context).lower() in ('true', '1', 'yes')
+
+    # Sim-time stamps and RTF cap are for fast_fixed_step runs. Real-time graphical
+    # sim uses wall-clock odometry stamps (stonefish_ros2 default when fast=false).
+    use_sim_time_stamps = LaunchConfiguration('use_sim_time_stamps').perform(context)
+    if not fast_fixed_step:
+        use_sim_time_stamps = 'false'
+    realtime_factor_cap = LaunchConfiguration('realtime_factor_cap').perform(context)
+    if not fast_fixed_step:
+        realtime_factor_cap = '0.0'
 
     cwd = os.getcwd()
     bridge_share = get_package_share_directory('bridge_stonefish')
@@ -53,10 +111,6 @@ def _launch_setup(context, *args, **kwargs):
     # into IncludeLaunchDescription can resolve against stonefish_ros2's own
     # defaults (use_sim_time_stamps=false).
     simulation_rate = LaunchConfiguration('simulation_rate').perform(context)
-    fast_fixed_step_s = LaunchConfiguration('fast_fixed_step').perform(context)
-    use_sim_time_stamps = LaunchConfiguration('use_sim_time_stamps').perform(context)
-    realtime_factor_cap = LaunchConfiguration('realtime_factor_cap').perform(context)
-    fast_fixed_step = fast_fixed_step_s.lower() in ('true', '1', 'yes')
 
     simulator_launch = 'stonefish_simulator_nogpu.launch.py' if headless else 'stonefish_simulator.launch.py'
     simulator_arguments = {
@@ -76,12 +130,20 @@ def _launch_setup(context, *args, **kwargs):
             'rendering_quality': 'low' if fast_fixed_step else 'high',
         })
 
-    # Setup ROS2 workspace based on current working directory
+    # Prefer underlay from the active shell, then fall back to common installs.
+    ros_underlay = os.environ.get('ROS_DISTRO')
+    if ros_underlay:
+        ros_underlay_setup = f'/opt/ros/{ros_underlay}/setup.bash'
+    else:
+        ros_underlay_setup = '/opt/ros/jazzy/setup.bash'
+        if not os.path.exists(ros_underlay_setup):
+            ros_underlay_setup = '/opt/ros/humble/setup.bash'
     ros_setup = os.path.join(cwd, 'install', 'setup.bash')
 
     # Common command
     common_cmd = (
-        f'source {ros_setup} && ros2 run mission_executor mission_executor '
+        f'source {ros_underlay_setup} && source {ros_setup} && '
+        f'ros2 run mission_executor mission_executor '
         f'--ros-args -p mission_name:={mission_name} '
         f'-p bridge_name:=stonefish '
         f'-p auv_name:={auv_name} '
@@ -115,11 +177,12 @@ def _launch_setup(context, *args, **kwargs):
                 'publish_all_objects': True,
             }],
         ),
-        Node(
+    ]
+    if use_joy:
+        ret.append(Node(
             package='joy',
             executable='joy_node',
-        ),
-    ]
+        ))
     if not stonefish_only:
         ret += [
             Node(
@@ -140,33 +203,81 @@ def _launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
-    mission_name_arg = DeclareLaunchArgument('mission_name')
-    auv_name_arg = DeclareLaunchArgument('auv_name')
-
-    env_file_name_arg = DeclareLaunchArgument('env_file_name')
-    auv_file_name_arg = DeclareLaunchArgument('auv_file_name', default_value='')
-    headless_arg = DeclareLaunchArgument('headless', default_value='false')
-    stonefish_only_arg = DeclareLaunchArgument('stonefish_only', default_value='false')
-    simulation_rate_arg = DeclareLaunchArgument('simulation_rate', default_value='300.0')
-    fast_fixed_step_arg = DeclareLaunchArgument('fast_fixed_step', default_value='false')
-    # Stamp odometry with simulation time so PID dt stays correct when the
-    # sim runs faster than wall clock (fast_fixed_step:=true).
-    use_sim_time_stamps_arg = DeclareLaunchArgument('use_sim_time_stamps', default_value='true')
-    # Only applies when fast_fixed_step is on; real-time stepping is already 1x.
-    # Keeps thruster command delay a fraction of a control period instead of
-    # seconds of plant time. 0.0 disables the cap.
-    realtime_factor_cap_arg = DeclareLaunchArgument('realtime_factor_cap', default_value='5.0')
-
     return LaunchDescription([
-        mission_name_arg,
-        auv_name_arg,
-        env_file_name_arg,
-        auv_file_name_arg,
-        headless_arg,
-        stonefish_only_arg,
-        simulation_rate_arg,
-        fast_fixed_step_arg,
-        use_sim_time_stamps_arg,
-        realtime_factor_cap_arg,
+        DeclareLaunchArgument(
+            'mission_name',
+            default_value='prequalify',
+            description='Mission loaded by mission_executor.',
+            choices=list(MISSIONS),
+        ),
+        DeclareLaunchArgument(
+            'auv_name',
+            default_value='hydrus',
+            description='AUV model; selects default scenario and mesh when env/auv files are omitted.',
+            choices=list(AUVS),
+        ),
+        DeclareLaunchArgument(
+            'env_file_name',
+            default_value='auto',
+            description=(
+                'Stonefish environment scenario under bridge_stonefish/data/scenarios/. '
+                'auto picks the default for auv_name. pool_env.scn auto-picks the per-AUV pool file.'
+            ),
+            choices=list(ENV_FILES),
+        ),
+        DeclareLaunchArgument(
+            'auv_file_name',
+            default_value='',
+            description=(
+                'Override AUV mesh scenario. Empty uses the default for auv_name '
+                f'({", ".join(f"{k}→{v}" for k, v in DEFAULT_AUV_FILE_BY_NAME.items())}).'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'headless',
+            default_value='false',
+            description='Run Stonefish without a GPU window (nogpu launch file).',
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'stonefish_only',
+            default_value='false',
+            description='Skip mission_executor; publish thrusters on /bridge/thrusters for direct testing.',
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'use_joy',
+            default_value='false',
+            description='Start joy_node (install with scripts/install_deps.sh --with-joy). Required for teleop.',
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'simulation_rate',
+            default_value='300.0',
+            description='Stonefish physics update rate (Hz).',
+        ),
+        DeclareLaunchArgument(
+            'fast_fixed_step',
+            default_value='false',
+            description='Run physics as fast as possible with fixed substeps.',
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'use_sim_time_stamps',
+            default_value='false',
+            description=(
+                'Stamp odometry with simulation time (for fast_fixed_step). '
+                'Automatically forced false for real-time sim.'
+            ),
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'realtime_factor_cap',
+            default_value='0.0',
+            description=(
+                'Max sim-time/wall-time ratio when fast_fixed_step is on. '
+                'Automatically 0 (disabled) for real-time sim. CI uses 5.0.'
+            ),
+        ),
         OpaqueFunction(function=_launch_setup),
     ])

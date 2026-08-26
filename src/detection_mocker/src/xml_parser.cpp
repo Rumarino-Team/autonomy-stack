@@ -202,21 +202,17 @@ namespace detection_mocker
         {
             // TODO: Make This A Function if More Classes Are Added.
             std::string cls = std::string(cls_str);
-            if( cls == "gate" )
-            {
+            if (cls == "gate") {
                 obj.cls = ClassType::GATE;
-            }
-           else if(cls == "cube"){
-            obj.cls = ClassType::CUBE;
-           }
-           else if(cls == "shark"){
-            obj.cls  = ClassType::SHARK;
-           }
-           else if(cls == "rectangle"){
-            obj.cls  = ClassType::RECTANGLE;
-           }
-            else
-            {
+            } else if (cls == "cube") {
+                obj.cls = ClassType::CUBE;
+            } else if (cls == "shark") {
+                obj.cls = ClassType::SHARK;
+            } else if (cls == "rectangle") {
+                obj.cls = ClassType::RECTANGLE;
+            } else if (cls == "swordfish" || cls == "sword_fish") {
+                obj.cls = ClassType::SWORD_FISH;
+            } else {
                 obj.cls = ClassType::OTHER;
             }
         }

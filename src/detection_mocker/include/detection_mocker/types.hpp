@@ -22,14 +22,15 @@ namespace detection_mocker
     /**
      * @brief The Classifer Class Types from Vision.
      */
+    // Must match mission_executor ObjectCls (src/mission_executor/src/main.rs).
     enum class ClassType
     {
-        CUBE = 1,
-        RECTANGLE=2,
-        GATE=3,
-        SHARK=3,
-        OTHER=4,
-
+        CUBE = 0,
+        RECTANGLE = 1,
+        GATE = 2,
+        SHARK = 3,
+        OTHER = 4,
+        SWORD_FISH = 5,
     };
 
 

@@ -42,6 +42,6 @@ colcon build --packages-select bridge_stonefish --symlink-install
 echo ""
 
 echo "Launching Stonefish simulator..."
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/humble/setup.bash
 source "$WORKSPACE_ROOT/install/setup.bash"
 ros2 launch bringup test_mission_executor.launch.py mission_name:=prequalify env_file_name:="$OUTPUT_SCN"
