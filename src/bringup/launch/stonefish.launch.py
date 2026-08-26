@@ -6,17 +6,54 @@ from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
+# --- discoverable configuration (also validated via --show-args choices) ---
+
+MISSIONS = (
+    'prequalify',
+    'teleop',
+    'drop_into_box',
+    'cardinal_directions',
+)
+
+AUVS = (
+    'hydrus',
+    'proteus',
+    'bluerov2',
+    'girona500',
+)
+
+ENV_FILES = (
+    'auto',
+    'hydrus_env.scn',
+    'hydrus_env_headless.scn',
+    'proteus_env.scn',
+    'pool_env.scn',
+    'pool_env_hydrus.scn',
+    'pool_env_proteus.scn',
+    'pool_env_bluerov2.scn',
+    'pool_env_girona500.scn',
+    'bluerov2_tank.scn',
+)
 
 DEFAULT_AUV_FILE_BY_NAME = {
     'bluerov2': 'bluerov2.scn',
     'proteus': 'proteus_auv.scn',
     'hydrus': 'hydrus_auv.scn',
+    'girona500': 'girona500_auv.scn',
+}
+
+DEFAULT_ENV_BY_AUV = {
+    'hydrus': 'hydrus_env.scn',
+    'proteus': 'proteus_env.scn',
+    'bluerov2': 'pool_env.scn',
+    'girona500': 'pool_env.scn',
 }
 
 POOL_ENV_SCENARIO_BY_AUV = {
     'bluerov2': 'pool_env_bluerov2.scn',
     'proteus': 'pool_env_proteus.scn',
     'hydrus': 'pool_env_hydrus.scn',
+    'girona500': 'pool_env_girona500.scn',
 }
 
 
@@ -26,10 +63,19 @@ def _resolve_auv_file_name(auv_name, explicit_auv_file_name):
     return DEFAULT_AUV_FILE_BY_NAME.get(auv_name, f'{auv_name}.scn')
 
 
+def _resolve_env_file_name(auv_name, env_file_name):
+    if env_file_name in ('', 'auto'):
+        return DEFAULT_ENV_BY_AUV.get(auv_name, f'{auv_name}_env.scn')
+    return env_file_name
+
+
 def _launch_setup(context, *args, **kwargs):
     mission_name = LaunchConfiguration('mission_name').perform(context)
     auv_name = LaunchConfiguration('auv_name').perform(context)
-    env_file_name = LaunchConfiguration('env_file_name').perform(context)
+    env_file_name = _resolve_env_file_name(
+        auv_name,
+        LaunchConfiguration('env_file_name').perform(context),
+    )
     explicit_auv_file_name = LaunchConfiguration('auv_file_name').perform(context)
     headless = LaunchConfiguration('headless').perform(context).lower() in ('true', '1', 'yes')
     stonefish_only = LaunchConfiguration('stonefish_only', default="no").perform(context).lower() in ('true', '1', 'yes')
@@ -128,26 +174,53 @@ def _launch_setup(context, *args, **kwargs):
 
 
 def generate_launch_description():
-    mission_name_arg = DeclareLaunchArgument('mission_name')
-    auv_name_arg = DeclareLaunchArgument('auv_name')
-
-    env_file_name_arg = DeclareLaunchArgument('env_file_name')
-    auv_file_name_arg = DeclareLaunchArgument('auv_file_name', default_value='')
-    headless_arg = DeclareLaunchArgument('headless', default_value='false')
-    stonefish_only_arg = DeclareLaunchArgument('stonefish_only', default_value='false')
-    use_joy_arg = DeclareLaunchArgument(
-        'use_joy',
-        default_value='false',
-        description='Start joy_node (requires ros-jazzy-joy). Use for teleop.',
-    )
-
     return LaunchDescription([
-        mission_name_arg,
-        auv_name_arg,
-        env_file_name_arg,
-        auv_file_name_arg,
-        headless_arg,
-        stonefish_only_arg,
-        use_joy_arg,
+        DeclareLaunchArgument(
+            'mission_name',
+            default_value='prequalify',
+            description='Mission loaded by mission_executor.',
+            choices=list(MISSIONS),
+        ),
+        DeclareLaunchArgument(
+            'auv_name',
+            default_value='hydrus',
+            description='AUV model; selects default scenario and mesh when env/auv files are omitted.',
+            choices=list(AUVS),
+        ),
+        DeclareLaunchArgument(
+            'env_file_name',
+            default_value='auto',
+            description=(
+                'Stonefish environment scenario under bridge_stonefish/data/scenarios/. '
+                'auto picks the default for auv_name. pool_env.scn auto-picks the per-AUV pool file.'
+            ),
+            choices=list(ENV_FILES),
+        ),
+        DeclareLaunchArgument(
+            'auv_file_name',
+            default_value='',
+            description=(
+                'Override AUV mesh scenario. Empty uses the default for auv_name '
+                f'({", ".join(f"{k}→{v}" for k, v in DEFAULT_AUV_FILE_BY_NAME.items())}).'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'headless',
+            default_value='false',
+            description='Run Stonefish without a GPU window (nogpu launch file).',
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'stonefish_only',
+            default_value='false',
+            description='Skip mission_executor; publish thrusters on /bridge/thrusters for direct testing.',
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'use_joy',
+            default_value='false',
+            description='Start joy_node (install with scripts/install_deps.sh --with-joy). Required for teleop.',
+            choices=['true', 'false'],
+        ),
         OpaqueFunction(function=_launch_setup),
     ])

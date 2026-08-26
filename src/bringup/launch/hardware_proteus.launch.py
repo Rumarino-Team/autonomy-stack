@@ -5,8 +5,21 @@ from launch import LaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 
+MISSIONS = (
+    'prequalify',
+    'teleop',
+    'drop_into_box',
+    'cardinal_directions',
+)
+
+
 def generate_launch_description():
-    mission_name_arg = DeclareLaunchArgument('mission_name')
+    mission_name_arg = DeclareLaunchArgument(
+        'mission_name',
+        default_value='prequalify',
+        description='Mission loaded by mission_executor.',
+        choices=list(MISSIONS),
+    )
 
     arduino_port_arg = DeclareLaunchArgument('arduino_port')
     arduino_baud_rate_arg = DeclareLaunchArgument('arduino_baud_rate')

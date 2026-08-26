@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM ros:jazzy-ros-base
+FROM ros:humble-ros-base
 
 RUN apt-get update && apt-get install -y \
     python3 \
@@ -14,10 +14,10 @@ RUN apt-get update && apt-get install -y \
     clang \
     python3-colcon-common-extensions \
     python3-rosdep \
-    ros-jazzy-vision-msgs \
-    ros-jazzy-image-transport \
-    ros-jazzy-pcl-conversions \
-    ros-jazzy-visualization-msgs \
+    ros-humble-vision-msgs \
+    ros-humble-image-transport \
+    ros-humble-pcl-conversions \
+    ros-humble-visualization-msgs \
     libfreetype6-dev \
     libsdl2-dev \
     libglm-dev \
@@ -43,11 +43,11 @@ COPY vendor/stonefish_ros2/package.xml ./src/stonefish_ros2/package.xml
 
 RUN rosdep init || true && rosdep update
 
-RUN bash -c "source /opt/ros/jazzy/setup.bash && \
+RUN bash -c "source /opt/ros/humble/setup.bash && \
     rosdep install --from-paths src vendor/stonefish --ignore-src -r -y || true"
 
 COPY src/interfaces ./src/interfaces
-RUN bash -lc "source /opt/ros/jazzy/setup.bash && \
+RUN bash -lc "source /opt/ros/humble/setup.bash && \
     colcon build --packages-select Stonefish interfaces \
     --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
@@ -56,7 +56,7 @@ COPY src/mission_executor/Cargo.toml ./src/mission_executor/Cargo.toml
 COPY src/mission_executor/CMakeLists.txt ./src/mission_executor/CMakeLists.txt
 RUN mkdir -p src/mission_executor/src && printf "fn main() {}" > src/mission_executor/src/main.rs
 
-RUN bash -lc "source /opt/ros/jazzy/setup.bash && source install/setup.bash && \
+RUN bash -lc "source /opt/ros/humble/setup.bash && source install/setup.bash && \
     colcon build --packages-select mission_executor \
     --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
@@ -65,13 +65,13 @@ COPY src/bridge_stonefish ./src/bridge_stonefish
 COPY src/detection_mocker ./src/detection_mocker
 COPY vendor/stonefish_ros2 ./src/stonefish_ros2
 
-RUN bash -c "source /opt/ros/jazzy/setup.bash && source install/setup.bash && \
+RUN bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && \
     colcon build --packages-select stonefish_ros2 bridge_stonefish bringup detection_mocker \
     --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
 COPY src/mission_executor/src ./src/mission_executor/src
 RUN ln -sf /ros2_ws/src/mission_executor/target /ros2_ws/target && \
-    bash -c "source /opt/ros/jazzy/setup.bash && source install/setup.bash && \
+    bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && \
     colcon build --packages-select mission_executor \
     --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
