@@ -63,6 +63,7 @@ struct MissionExecutor {
     pub goal: ArcSwap<Vector6<f64>>,
     pub stop: AtomicBool,
     pub avg_current: Arc<Mutex<f64>>,
+    pub odometry_ready: AtomicBool,
 }
 
 const CLOSE_ENOUGH: f64 = 1.0;
@@ -90,6 +91,7 @@ impl MissionExecutor {
             goal: ArcSwap::new(Arc::new(goal)),
             stop: AtomicBool::new(false),
             avg_current: Arc::new(Mutex::new(0.0)),
+            odometry_ready: AtomicBool::new(false),
         }
     }
 
@@ -362,7 +364,15 @@ async fn main() {
 
     let consume_odometry_sub = |td: Arc<MissionExecutor>| async move {
         while let Some(msg) = odometry_sub.next().await {
-            td.pose.store(Arc::new(Pose::from(&msg.pose.pose)));
+            let pose = Pose::from(&msg.pose.pose);
+            // Hold station at spawn: set goal before pose so the PID never sees a mismatch.
+            if !td.odometry_ready.load(Ordering::Relaxed) {
+                td.goal.store(Arc::new(Vector6::from(pose)));
+                td.pose.store(Arc::new(pose));
+                td.odometry_ready.store(true, Ordering::Release);
+            } else {
+                td.pose.store(Arc::new(pose));
+            }
         }
     };
 
@@ -393,12 +403,20 @@ async fn main() {
         let log_interval = Duration::from_millis(500);
         let mut last_log = Instant::now();
         while !td.stop.load(Ordering::Relaxed) {
+            if !td.odometry_ready.load(Ordering::Acquire) {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                prev_now = Instant::now();
+                prev_pose_err = Vector6::zeros();
+                sum_err = Vector6::zeros();
+                continue;
+            }
             let current_cfg = cfg.load();
             let PidConfig { kp, ki, kd } = current_cfg.pid[&bridge_name];
             let tam_x_y_z_roll_pitch_yaw = &current_cfg.tam;
 
             let now = Instant::now();
-            let dt = now.duration_since(prev_now).as_secs_f64();
+            // Clamp dt so a stall or first tick after ready cannot explode I/D terms.
+            let dt = now.duration_since(prev_now).as_secs_f64().clamp(1e-3, 0.2);
 
             let pose = **td.pose.load();
             let goal = **td.goal.load();
@@ -408,6 +426,8 @@ async fn main() {
             // r2r::log_info!("pose", "{current_pose:?}");
 
             let mut pose_err = goal - current_pose;
+            pose_err[3] = wrap_angle(pose_err[3]);
+            pose_err[4] = wrap_angle(pose_err[4]);
 
             let rot = UnitQuaternion::from_quaternion(pose.rot);
             let forward = rot * Vector3::y(); // if vehicle’s forward is +Y in body frame

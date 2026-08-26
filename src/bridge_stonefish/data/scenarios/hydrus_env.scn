@@ -61,7 +61,7 @@
 
 	<!-- Gate -->
 
-	<static name="Gate" type="model" clss="gate">
+	<static name="Gate" type="model" cls="gate">
 		<physical>
 			<mesh filename="models/gate.obj" scale="1.0" convex="false" />
 			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
@@ -88,7 +88,7 @@
 
 	<static name="Box" type="box" cls="other">
 		<dimensions xyz="1.50 1.50 1.50" thickness="0.003" />
-		<origin rpy="0.0 0.0 0.0" xyz="" />
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
 		<material name="aluminium" />
 		<look name="black" />
 		<world_transform rpy="0.0 0.0 0.0" xyz="1.0 2.0 2.0" />

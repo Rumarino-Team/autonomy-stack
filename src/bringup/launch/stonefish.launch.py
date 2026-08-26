@@ -130,12 +130,20 @@ def _launch_setup(context, *args, **kwargs):
             'rendering_quality': 'low' if fast_fixed_step else 'high',
         })
 
-    # Setup ROS2 workspace based on current working directory
+    # Prefer underlay from the active shell, then fall back to common installs.
+    ros_underlay = os.environ.get('ROS_DISTRO')
+    if ros_underlay:
+        ros_underlay_setup = f'/opt/ros/{ros_underlay}/setup.bash'
+    else:
+        ros_underlay_setup = '/opt/ros/jazzy/setup.bash'
+        if not os.path.exists(ros_underlay_setup):
+            ros_underlay_setup = '/opt/ros/humble/setup.bash'
     ros_setup = os.path.join(cwd, 'install', 'setup.bash')
 
     # Common command
     common_cmd = (
-        f'source {ros_setup} && ros2 run mission_executor mission_executor '
+        f'source {ros_underlay_setup} && source {ros_setup} && '
+        f'ros2 run mission_executor mission_executor '
         f'--ros-args -p mission_name:={mission_name} '
         f'-p bridge_name:=stonefish '
         f'-p auv_name:={auv_name} '

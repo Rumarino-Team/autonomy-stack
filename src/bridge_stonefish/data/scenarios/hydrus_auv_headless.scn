@@ -60,10 +60,8 @@
 				<material name="pvc" />
 				<look name="propeller" />
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.05" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
@@ -81,10 +79,8 @@
 				<material name="pvc" />
 				<look name="propeller" />
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.05" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
@@ -102,10 +98,8 @@
 				<material name="pvc" />
 				<look name="propeller" />
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.05" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
@@ -123,10 +117,8 @@
 				<material name="pvc" />
 				<look name="propeller" />
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.05" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
@@ -145,10 +137,8 @@
 				<material name="pvc" />
 				<look name="propeller" />
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.05" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
@@ -166,10 +156,8 @@
 				<material name="pvc" />
 				<look name="propeller" />
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.05" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
@@ -187,10 +175,8 @@
 				<material name="pvc" />
 				<look name="propeller" />
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.05" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
@@ -208,10 +194,8 @@
 				<material name="pvc" />
 				<look name="propeller" />
 			</propeller>
-			<rotor_dynamics type="mechanical_pi">
-				<kp value="1.0" />
-				<ki value="10.0" />
-				<ilimit value="5.0" />
+			<rotor_dynamics type="first_order">
+				<time_constant value="0.05" />
 			</rotor_dynamics>
 			<thrust_model type="fluid_dynamics">
 				<thrust_coeff forward="0.48" reverse="0.48" />
