@@ -44,10 +44,7 @@ jobs:
               mission_name:=prequalify \
               auv_name:=hydrus \
               env_file_name:=hydrus_env_headless.scn \
-              headless:=true \
-              fast_fixed_step:=true \
-              use_sim_time_stamps:=true \
-              realtime_factor_cap:=5.0 &
+              headless:=true &
             LAUNCH_PID=\$! && \
             sleep 15 && \
             kill \$LAUNCH_PID 2>/dev/null || true
