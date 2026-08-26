@@ -96,17 +96,31 @@ def _launch_setup(context, *args, **kwargs):
         detection_env_file_name = 'pool_env.scn'
     detection_scn_path = os.path.join(bridge_share, 'data', 'scenarios', detection_env_file_name)
 
+    # Evaluate in this launch context. Passing unevaluated LaunchConfiguration
+    # into IncludeLaunchDescription can resolve against stonefish_ros2's own
+    # defaults (use_sim_time_stamps=false).
+    simulation_rate = LaunchConfiguration('simulation_rate').perform(context)
+    fast_fixed_step_s = LaunchConfiguration('fast_fixed_step').perform(context)
+    use_sim_time_stamps = LaunchConfiguration('use_sim_time_stamps').perform(context)
+    realtime_factor_cap = LaunchConfiguration('realtime_factor_cap').perform(context)
+    fast_fixed_step = fast_fixed_step_s.lower() in ('true', '1', 'yes')
+
     simulator_launch = 'stonefish_simulator_nogpu.launch.py' if headless else 'stonefish_simulator.launch.py'
     simulator_arguments = {
         'simulation_data': os.path.join(bridge_share, 'data'),
         'scenario_desc': scenario_desc_path,
-        'simulation_rate': '300.0',
+        'simulation_rate': simulation_rate,
+        'fast_fixed_step': fast_fixed_step_s,
+        'use_sim_time_stamps': use_sim_time_stamps,
+        'realtime_factor_cap': realtime_factor_cap,
     }
     if not headless:
+        # High-quality 1080p plus camera/IMU publish at 100x realtime adds
+        # wall-clock delay that becomes seconds of plant delay in sim time.
         simulator_arguments.update({
-            'window_res_x': '1920',
-            'window_res_y': '1080',
-            'rendering_quality': 'high',
+            'window_res_x': '1280' if fast_fixed_step else '1920',
+            'window_res_y': '720' if fast_fixed_step else '1080',
+            'rendering_quality': 'low' if fast_fixed_step else 'high',
         })
 
     # Setup ROS2 workspace based on current working directory
@@ -221,6 +235,28 @@ def generate_launch_description():
             default_value='false',
             description='Start joy_node (install with scripts/install_deps.sh --with-joy). Required for teleop.',
             choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'simulation_rate',
+            default_value='300.0',
+            description='Stonefish physics update rate (Hz).',
+        ),
+        DeclareLaunchArgument(
+            'fast_fixed_step',
+            default_value='false',
+            description='Run physics as fast as possible with fixed substeps.',
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'use_sim_time_stamps',
+            default_value='true',
+            description='Stamp odometry with simulation time so PID dt stays correct when running faster than realtime.',
+            choices=['true', 'false'],
+        ),
+        DeclareLaunchArgument(
+            'realtime_factor_cap',
+            default_value='5.0',
+            description='Max sim-time/wall-time ratio when fast_fixed_step is on. 0.0 disables the cap.',
         ),
         OpaqueFunction(function=_launch_setup),
     ])

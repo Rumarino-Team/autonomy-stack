@@ -26,7 +26,7 @@ source install/setup.bash
 
 ## Run simulation
 
-Launch from the **repo root**. All missions, AUVs, and scenario options are defined in the launch file:
+Launch from the **repo root**. All missions, AUVs, scenarios, and sim-time options are defined in the launch file:
 
 ```sh
 ros2 launch bringup stonefish.launch.py --show-args
